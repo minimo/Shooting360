@@ -43,7 +43,6 @@
           >
             <h3>{{ option.name }}</h3>
             <p>{{ option.description }}</p>
-            <div v-if="index === selectedIndex" class="select-hint">PRESS ENTER</div>
           </div>
         </div>
       </div>
@@ -142,12 +141,17 @@ const selectPowerUp = (index: number) => {
 const handlePowerUpKey = (e: KeyboardEvent) => {
   if (!showPowerUp.value) return
 
-  if (e.key === 'ArrowLeft' || e.key === 'Left') {
+  const key = e.key.toLowerCase()
+  if (key === 'z') {
+    // Zキーで次を選択（ループ）
+    selectedIndex.value = (selectedIndex.value + 1) % powerUpOptions.value.length
+  } else if (key === 'x' || key === 'enter') {
+    // XキーまたはEnterで決定
+    selectPowerUp(selectedIndex.value)
+  } else if (e.key === 'ArrowLeft' || e.key === 'Left') {
     selectedIndex.value = (selectedIndex.value - 1 + powerUpOptions.value.length) % powerUpOptions.value.length
   } else if (e.key === 'ArrowRight' || e.key === 'Right') {
     selectedIndex.value = (selectedIndex.value + 1) % powerUpOptions.value.length
-  } else if (e.key === 'Enter' || e.key === ' ') {
-    selectPowerUp(selectedIndex.value)
   }
 }
 
@@ -368,14 +372,6 @@ onUnmounted(() => {
   0% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
   50% { box-shadow: 0 0 25px rgba(0, 255, 204, 0.6); }
   100% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
-}
-
-.select-hint {
-  margin-top: 1.5rem;
-  font-size: 0.8rem;
-  color: #00ffcc;
-  font-weight: bold;
-  letter-spacing: 1px;
 }
 
 .powerup-card h3 {
