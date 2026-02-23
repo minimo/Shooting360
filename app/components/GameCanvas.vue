@@ -393,9 +393,9 @@ onUnmounted(() => {
 
 .pause-title {
   font-size: 4rem !important;
-  color: #fff !important;
+  color: #aaa !important;
   letter-spacing: 0.5rem;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5) !important;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2) !important;
   margin-bottom: 1rem !important;
 }
 </style>
