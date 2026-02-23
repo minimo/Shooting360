@@ -59,7 +59,6 @@ export class SniperEnemy extends GameObject {
         // 正方形（半径24相当）
         g.rect(-24, -24, 48, 48)
         g.fill({ color: 0x3333ff, alpha: 1 })
-        g.stroke({ width: 3, color: 0x8888ff, alpha: 0.8 })
         this.display.addChild(g)
     }
 

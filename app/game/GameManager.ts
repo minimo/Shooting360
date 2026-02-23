@@ -489,9 +489,9 @@ export class GameManager {
                     if (!enemy.isAlive) {
                         this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
                         if (enemy instanceof SniperEnemy) {
-                            this.addScore(200)
+                            this.addScore(1000)
                         } else {
-                            this.addScore(100)
+                            this.addScore(300)
                         }
                     }
                 }
@@ -515,9 +515,9 @@ export class GameManager {
                             this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
                             // 撃破加点
                             if (enemy instanceof SniperEnemy) {
-                                this.addScore(200)
+                                this.addScore(1000)
                             } else {
-                                this.addScore(100)
+                                this.addScore(300)
                             }
                         }
                     }
@@ -596,6 +596,7 @@ export class GameManager {
                 if (this.lineCircleTest(start.x, start.y, end.x, end.y, missile.position.x, missile.position.y, missile.radius)) {
                     missile.isAlive = false
                     missile.shouldExplode = true
+                    this.addScore(10)
                     this.spawnHitEffect(missile.position.x, missile.position.y, 0xffffff, missile.velocity.x, missile.velocity.y)
                 }
             }
@@ -611,7 +612,7 @@ export class GameManager {
                     if (missile.hp <= 0) {
                         missile.isAlive = false
                         missile.shouldExplode = true
-                        // 撃破加点：誘導弾は0点 (ユーザー指定)
+                        this.addScore(10)
                     }
                     this.spawnHitEffect(missile.position.x, missile.position.y, 0xffffff, missile.velocity.x, missile.velocity.y)
                 }

@@ -59,7 +59,6 @@ export class Enemy extends GameObject {
             { x: 12, y: 10 },
         ])
         g.fill({ color: 0xff3333, alpha: 1 })
-        g.stroke({ width: 2, color: 0xff8888, alpha: 0.6 })
         this.display.addChild(g)
     }
 

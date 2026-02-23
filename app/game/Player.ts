@@ -83,8 +83,6 @@ export class Player extends GameObject {
             -16, 18
         ])
         body.fill({ color: 0x00ffff })
-        // 縁取り
-        body.stroke({ color: 0xffffff, width: 2 })
         this.display.addChild(body)
     }
 
