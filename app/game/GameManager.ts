@@ -398,8 +398,6 @@ export class GameManager {
 
         this.hpGauge.rect(this.screenWidth / 2 - 100, 20, 200 * ratio, 20)
         this.hpGauge.fill({ color, alpha: 1 })
-
-        this.hpGauge.stroke({ color: 0xffffff, width: 2 })
     }
 
     /**
