@@ -1,75 +1,127 @@
-# Nuxt Minimal Starter
+# 🚀 Shooting 360
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+全方位シューティングゲーム — Nuxt 4 + PixiJS で構築されたブラウザベースの2Dシューター。
 
-## Setup
+無限にループする広大な宇宙空間を舞台に、360度自由に回転・加速しながら、次々と襲いかかる敵機を撃破していくアーケードスタイルのゲームです。
 
-Make sure to install dependencies:
+---
+
+## 🎮 操作方法
+
+| キー | アクション |
+|---|---|
+| ⬆️ **Arrow Up** | 前方加速 |
+| ⬇️ **Arrow Down** | 減速 |
+| ⬅️➡️ **Left / Right** | 360度回転 |
+| 🔫 **Z** | 通常弾（高速連射） |
+| ⚡ **X** | レーザー（チャージ式 / 一撃必殺） |
+| 🚀 **C** | ブースト（超高速回避移動） |
+
+---
+
+## ✨ 主な特徴
+
+### 戦闘システム
+- **通常弾**: 高速連射可能な主力武器。弾丸は超長距離（2400px）まで飛翔
+- **レーザー**: チャージ後に発射される貫通ビーム。一撃で敵を粉砕する究極兵器。旋回中は美しい残像エフェクト付き
+- **ブースト**: 瞬間的な超加速で危機的状況から脱出。2秒のクールダウンとパワー消費あり
+
+### 敵機
+- **赤三角（Enemy）**: 高い旋回性能でプレイヤーを執拗に追尾し、一撃離脱の空中戦を仕掛ける
+- **青四角（SniperEnemy）**: 大型の強化敵機。3秒ごとに8方向へ誘導ミサイルを一斉射出。花火のような展開演出の後、プレイヤーへ追尾を開始
+
+### エフェクト
+- ヒットパーティクル、爆発フラッシュ、画面シェイク
+- 敵機の慣性を引き継いだ物理ベースの爆発エフェクト
+- 自機破壊時の3秒間のド派手な爆発演出（連鎖爆発 → 巨大爆散）
+- 誘導ミサイルの誘爆チェインリアクション
+
+### その他
+- **スコアシステム**: 通常弾ヒット(+10)、赤三角撃破(+100)、青四角撃破(+200)
+- **ミニマップ**: 右上にワールド全体の状況を表示
+- **パワー管理**: レーザーの使用量を管理するオーバーヒート制
+- **マップループ**: 上下左右が繋がった無限の戦域
+
+---
+
+## 🛠️ 技術スタック
+
+| 技術 | 用途 |
+|---|---|
+| **Nuxt 4** | フレームワーク（SSR無効 / SPA） |
+| **PixiJS 8** | 2D レンダリングエンジン |
+| **TypeScript** | OOP ベースのゲームロジック |
+| **Vue 3** | UI コンポーネント |
+
+---
+
+## 📁 プロジェクト構成
+
+```
+Shooting360/
+├── app/
+│   ├── app.vue                    # ルートコンポーネント
+│   ├── pages/index.vue            # ゲームページ
+│   ├── components/GameCanvas.vue  # PixiJS初期化 + メインループ
+│   ├── composables/useInput.ts    # キーボード入力管理
+│   └── game/
+│       ├── GameObject.ts          # 基底クラス（抽象）
+│       ├── Player.ts              # 自機
+│       ├── Bullet.ts              # 弾丸
+│       ├── Enemy.ts               # 赤三角敵機
+│       ├── SniperEnemy.ts         # 青四角敵機
+│       ├── HomingMissile.ts       # 誘導ミサイル
+│       ├── Laser.ts               # レーザー武器
+│       ├── Explosion.ts           # 爆発エフェクト
+│       ├── HomingExplosion.ts     # ダメージ付き爆発
+│       ├── Particle.ts            # パーティクル
+│       ├── Minimap.ts             # ミニマップUI
+│       ├── BackgroundObject.ts    # 背景オブジェクト
+│       └── GameManager.ts         # 全体管理（衝突判定・スポーン・UI）
+├── nuxt.config.ts
+├── package.json
+└── tsconfig.json
+```
+
+---
+
+## 🚀 セットアップ
 
 ```bash
-# npm
+# Node.js v20+ が必要
+nvm use 22
+
+# 依存パッケージのインストール
 npm install
 
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
+# 開発サーバー起動
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+ブラウザで `http://localhost:3000` を開き、任意のキーでゲーム開始。
 
-Build the application for production:
+---
 
-```bash
-# npm
-npm run build
+## 📐 クラス設計
 
-# pnpm
-pnpm build
+```
+GameObject (抽象基底)
+├── Player          — 自機（加速・回転・武器管理・パワーゲージ）
+├── Bullet          — 弾丸（直進・距離制限・陣営判別）
+├── Enemy           — 赤三角敵（追尾AI・一撃離脱・射撃）
+├── SniperEnemy     — 青四角敵（大型・誘導ミサイル発射）
+├── HomingMissile   — 誘導ミサイル（展開→追尾・近接爆発・誘爆）
+├── Laser           — レーザー（チャージ・貫通・残像）
+├── Explosion       — 爆発エフェクト（慣性付き・減衰）
+├── HomingExplosion  — ダメージ判定付き爆発
+├── Particle        — パーティクル（火花・破片）
+└── BackgroundObject — 背景装飾
 
-# yarn
-yarn build
-
-# bun
-bun run build
+GameManager — 全オブジェクトの生成・更新・衝突判定・UI管理
 ```
 
-Locally preview production build:
+---
 
-```bash
-# npm
-npm run preview
+## 📝 ライセンス
 
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+Private
