@@ -490,6 +490,11 @@ export class GameManager {
                     this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffffff, enemy.velocity.x, enemy.velocity.y)
                     if (!enemy.isAlive) {
                         this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                        if (enemy instanceof SniperEnemy) {
+                            this.addScore(200)
+                        } else {
+                            this.addScore(100)
+                        }
                     }
                 }
             }
