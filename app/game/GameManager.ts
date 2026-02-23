@@ -33,6 +33,18 @@ export class GameManager {
     private hasTriggeredMassiveExplosion: boolean = false
     private score: number = 0
     private scoreText: Text | null = null
+    private waveText: Text | null = null
+    private announcementText: Text | null = null
+
+    // Wave管理
+    private currentWave: number = 0
+    private waveEnemiesSpawned: number = 0
+    private totalEnemiesInWave: number = 0
+    private isWaveClearing: boolean = false
+    private isWaitingForClearAnnouncement: boolean = false
+    private isSpawningDelayed: boolean = false
+    private isWaitingForNextWave: boolean = false
+    private waveTransitionTimer: number = 0
 
     // スポーンタイマー
     private enemySpawnTimer: number = 0
@@ -63,6 +75,14 @@ export class GameManager {
         this.uiContainer.visible = false
         this.gameOverTimer = 0
         this.score = 0 // スコアリセット
+        this.currentWave = 0
+        this.waveEnemiesSpawned = 0
+        this.totalEnemiesInWave = 0
+        this.isWaveClearing = false
+        this.isWaitingForClearAnnouncement = false
+        this.isSpawningDelayed = false
+        this.isWaitingForNextWave = false
+        this.waveTransitionTimer = 0
         this.hasTriggeredMassiveExplosion = false
 
         // --- Minimap ---
@@ -149,6 +169,95 @@ export class GameManager {
         this.scoreText.x = 20
         this.scoreText.y = 30 // HPゲージ (y=20, h=20) の中心 y=30 に合わせる
         this.uiContainer.addChild(this.scoreText)
+
+        // --- Wave Text ---
+        const waveStyle = style.clone()
+        waveStyle.align = 'right'
+        this.waveText = new Text({ text: 'WAVE 1', style: waveStyle })
+        this.waveText.anchor.set(1, 0.5)
+        this.waveText.x = this.screenWidth - 20
+        this.waveText.y = 30 // スコア・HPゲージと同じ高さ
+        this.uiContainer.addChild(this.waveText)
+
+        // --- Announcement Text (Center) ---
+        const annStyle = style.clone()
+        annStyle.fontSize = 64
+        annStyle.align = 'center'
+        this.announcementText = new Text({ text: '', style: annStyle })
+        this.announcementText.anchor.set(0.5, 0.5)
+        this.announcementText.x = this.screenWidth / 2
+        this.announcementText.y = this.screenHeight / 2 - 150 // 少し上に上げる
+        this.announcementText.alpha = 0
+        this.uiContainer.addChild(this.announcementText)
+    }
+
+    private nextWave(): void {
+        if (this.isWaveClearing) return
+        this.currentWave++
+        this.waveEnemiesSpawned = 0
+        // Wave毎の敵数: Wave 1=3, Wave 2=5, Wave 3=8, Wave 4=12, Wave 5=15...
+        const enemyCounts = [0, 3, 5, 8, 12, 15]
+        this.totalEnemiesInWave = enemyCounts[this.currentWave] || (15 + (this.currentWave - 5) * 5)
+
+        const isBossWave = this.currentWave % 5 === 0
+        const text = isBossWave ? `WAVE ${this.currentWave} BOSS START` : `WAVE ${this.currentWave} START`
+        this.showAnnouncement(text, 240) // 4秒表示
+        if (this.waveText) this.waveText.text = `WAVE ${this.currentWave}${isBossWave ? ' (BOSS)' : ''}`
+    }
+
+    private clearWave(): void {
+        if (this.isWaveClearing) return
+        this.isWaveClearing = true
+        this.showAnnouncement(`WAVE ${this.currentWave} CLEAR`, 240) // 4秒表示
+    }
+
+    private showAnnouncement(text: string, duration: number): void {
+        if (!this.announcementText) return
+        this.announcementText.text = text
+        this.announcementText.alpha = text === '' ? 0 : 0.5 // 半透明
+        this.waveTransitionTimer = duration
+    }
+
+    private updateWaveAnnouncement(delta: number): void {
+        if (!this.announcementText) return
+        if (this.waveTransitionTimer > 0) {
+            this.waveTransitionTimer -= delta
+            // 後半1秒でフェードアウト
+            if (this.waveTransitionTimer < 60) {
+                // 最大 0.5 から 0 へ
+                this.announcementText.alpha = (this.waveTransitionTimer / 60) * 0.5
+            } else {
+                this.announcementText.alpha = 0.5
+            }
+        } else {
+            const previousText = this.announcementText.text
+            this.announcementText.alpha = 0
+            this.announcementText.text = '' // 終了したらテキストクリア
+
+            if (this.isWaitingForClearAnnouncement) {
+                // 全滅後の3秒待機が終了 -> CLEAR表示へ
+                this.isWaitingForClearAnnouncement = false
+                this.clearWave()
+            } else if (this.isWaveClearing) {
+                // CLEAR表示終了 -> 1秒待機へ
+                this.isWaveClearing = false
+                this.isWaitingForNextWave = true
+                this.showAnnouncement('', 60) // 何も表示せず1秒待機
+            } else if (previousText.includes('START')) {
+                // START表示終了 -> 敵出現前の3秒待機へ
+                this.isSpawningDelayed = true
+                this.showAnnouncement('', 180) // 何も表示せず3秒待機
+            } else if (previousText === '') {
+                if (this.isSpawningDelayed) {
+                    // 3秒待機が終わったらスポーン許可
+                    this.isSpawningDelayed = false
+                } else if (this.isWaitingForNextWave) {
+                    // 1秒待機が終わったら次のWave開始
+                    this.isWaitingForNextWave = false
+                    this.nextWave()
+                }
+            }
+        }
     }
 
     private addScore(amount: number): void {
@@ -331,16 +440,39 @@ export class GameManager {
             this.shakeFrames = Math.max(this.shakeFrames, 2)
         }
 
-        // 2. 敵スポーン管理 (ゲーム開始後のみ・自機生存中のみ)
+        // 2. Wave管理 & スポーン管理 (ゲーム開始後のみ・自機生存中のみ)
         if (this.isGameActive && this.player.isAlive) {
-            this.enemySpawnTimer -= delta
-            if (this.enemySpawnTimer <= 0) {
-                // 現在生存している敵の数を数える
-                const enemyCount = this.objects.filter(obj => (obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive).length
-                if (enemyCount < 5) {
-                    this.spawnEnemy()
+            // 初回Wave開始
+            if (this.currentWave === 0 && !this.isWaveClearing) {
+                this.nextWave()
+            }
+
+            this.updateWaveAnnouncement(delta)
+
+            // スポーン処理
+            if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isSpawningDelayed && !this.isWaitingForNextWave && this.waveTransitionTimer <= 0 && this.waveEnemiesSpawned < this.totalEnemiesInWave) {
+                this.enemySpawnTimer -= delta
+                if (this.enemySpawnTimer <= 0) {
+                    const enemyCount = this.objects.filter(obj => (obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive).length
+                    // 最大同時出現数: Waveが進む毎に増加 (5 + Wave/2)
+                    const maxSimultaneous = 5 + Math.floor(this.currentWave / 2)
+                    if (enemyCount < maxSimultaneous) {
+                        this.spawnEnemy()
+                    }
+                    // スポーン間隔もWave毎に短縮 (最小0.5秒)
+                    const interval = Math.max(30, 120 - this.currentWave * 5)
+                    this.enemySpawnTimer = interval
                 }
-                this.enemySpawnTimer = this.enemySpawnInterval
+            }
+
+            // クリア判定: 規定数スポーン済み & 生存敵ゼロ
+            if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isWaitingForNextWave && this.waveEnemiesSpawned >= this.totalEnemiesInWave) {
+                const enemyCount = this.objects.filter(obj => (obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive).length
+                if (enemyCount === 0) {
+                    // 全滅後、3秒待機してからクリアアナウンスを出す
+                    this.isWaitingForClearAnnouncement = true
+                    this.showAnnouncement('', 180)
+                }
             }
         }
 
@@ -404,7 +536,7 @@ export class GameManager {
      * ミニマップの位置を右上に更新
      */
     private updateMinimapPosition(): void {
-        this.minimap.setPosition(this.screenWidth - 340, 20)
+        this.minimap.setPosition(20, this.screenHeight - 340)
     }
 
     /**
@@ -418,6 +550,21 @@ export class GameManager {
             this.player.screenWidth = width
             this.player.screenHeight = height
         }
+
+        // UI要素の再配置
+        if (this.scoreText) {
+            this.scoreText.x = 20
+            this.scoreText.y = 30
+        }
+        if (this.waveText) {
+            this.waveText.x = width - 20
+            this.waveText.y = 30
+        }
+        if (this.announcementText) {
+            this.announcementText.x = width / 2
+            this.announcementText.y = height / 2 - 150 // 少し上に上げる
+        }
+
         this.updateMinimapPosition()
     }
 
@@ -452,20 +599,28 @@ export class GameManager {
      * 敵機スポーン
      */
     private spawnEnemy(): void {
-        // プレイヤーから離れた場所にスポーン
+        if (!this.app) return
+
+        this.waveEnemiesSpawned++
+
+        // Wave数に応じてSniperEnemyの出現率を調整
+        // Wave 1: 0%, Wave 2: 10%, Wave 3: 25%, Wave 4: 40%, Wave 5: 60%...
+        const sniperRate = Math.min(0.8, (this.currentWave - 1) * 0.15)
+        const isSniper = Math.random() < sniperRate
+
+        // 画面外のランダムな位置にスポーン
         const angle = Math.random() * Math.PI * 2
         // マップが広大になったため、スポーン範囲を少し広げて出現を自然にする
         const dist = 800 + Math.random() * 400
         const x = this.player.position.x + Math.sin(angle) * dist
         const y = this.player.position.y - Math.cos(angle) * dist
 
-        // 70%で通常の敵、30%でスナイパー型の敵
-        if (Math.random() < 0.7) {
-            const enemy = new Enemy(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'))
-            this.addObject(enemy)
-        } else {
+        if (isSniper) {
             const sniper = new SniperEnemy(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnHomingMissile(ex, ey, ea))
             this.addObject(sniper)
+        } else {
+            const enemy = new Enemy(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'))
+            this.addObject(enemy)
         }
     }
 
