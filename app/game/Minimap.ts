@@ -2,8 +2,8 @@ import { Container, Graphics } from 'pixi.js'
 import type { Player } from './Player'
 import type { GameObject } from './GameObject'
 import { Bullet } from './Bullet'
-import { Enemy } from './Enemy'
-import { SniperEnemy } from './SniperEnemy'
+import { Fighter } from './Enemy/Fighter'
+import { MissileFlower } from './Enemy/MissileFlower'
 import { HomingMissile } from './HomingMissile'
 
 /**
@@ -65,7 +65,7 @@ export class Minimap {
 
         // 2. 敵機 (4x4, 赤)
         for (const obj of objects) {
-            if ((obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive) {
+            if ((obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) {
                 const pos = toMap(obj.position.x, obj.position.y)
                 if (this.isInMap(pos.x, pos.y)) {
                     this.mapGraphics.rect(pos.x - 2, pos.y - 2, 4, 4)

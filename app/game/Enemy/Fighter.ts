@@ -1,13 +1,13 @@
 import { Graphics } from 'pixi.js'
-import { GameObject } from './GameObject'
-import type { Player, SpawnBulletFn } from './Player'
+import { GameObject } from '../GameObject'
+import type { Player, SpawnBulletFn } from '../Player'
 
 /**
- * 敵機クラス
+ * 敵機クラス (Fighter)
  *
  * 画面外から出現し、自機を追尾しながら弾を撃ってくる。
  */
-export class Enemy extends GameObject {
+export class Fighter extends GameObject {
     /** 移動速度 */
     public speed: number = 14
 

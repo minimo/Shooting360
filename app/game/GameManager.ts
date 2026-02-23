@@ -1,8 +1,8 @@
 import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js'
 import { Player } from './Player'
 import { Bullet } from './Bullet'
-import { Enemy } from './Enemy'
-import { SniperEnemy } from './SniperEnemy'
+import { Fighter } from './Enemy/Fighter'
+import { MissileFlower } from './Enemy/MissileFlower'
 import { Explosion } from './Explosion'
 import { Particle } from './Particle'
 import { Laser, LaserState } from './Laser'
@@ -475,7 +475,7 @@ export class GameManager {
             if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isSpawningDelayed && !this.isWaitingForNextWave && this.waveTransitionTimer <= 0 && this.waveEnemiesSpawned < this.totalEnemiesInWave) {
                 this.enemySpawnTimer -= delta
                 if (this.enemySpawnTimer <= 0) {
-                    const enemyCount = this.objects.filter(obj => (obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive).length
+                    const enemyCount = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive).length
                     // 最大同時出現数: Waveが進む毎に増加 (5 + Wave/2)
                     const maxSimultaneous = 5 + Math.floor(this.currentWave / 2)
                     if (enemyCount < maxSimultaneous) {
@@ -489,7 +489,7 @@ export class GameManager {
 
             // クリア判定: 規定数スポーン済み & 生存敵ゼロ
             if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isWaitingForNextWave && this.waveEnemiesSpawned >= this.totalEnemiesInWave) {
-                const enemyCount = this.objects.filter(obj => (obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive).length
+                const enemyCount = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive).length
                 if (enemyCount === 0) {
                     // 全滅後、3秒待機してからクリアアナウンスを出す
                     this.isWaitingForClearAnnouncement = true
@@ -616,7 +616,7 @@ export class GameManager {
 
         this.waveEnemiesSpawned++
 
-        // Wave数に応じてSniperEnemyの出現率を調整
+        // Wave数に応じてMissileFlowerの出現率を調整
         // Wave 1: 0%, Wave 2: 10%, Wave 3: 25%, Wave 4: 40%, Wave 5: 60%...
         const sniperRate = Math.min(0.8, (this.currentWave - 1) * 0.15)
         const isSniper = Math.random() < sniperRate
@@ -629,10 +629,10 @@ export class GameManager {
         const y = this.player.position.y - Math.cos(angle) * dist
 
         if (isSniper) {
-            const sniper = new SniperEnemy(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnHomingMissile(ex, ey, ea))
+            const sniper = new MissileFlower(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnHomingMissile(ex, ey, ea))
             this.addObject(sniper)
         } else {
-            const enemy = new Enemy(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'))
+            const enemy = new Fighter(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'))
             this.addObject(enemy)
         }
     }
@@ -643,7 +643,7 @@ export class GameManager {
     private checkCollisions(): void {
         // 弾丸などの生存しているオブジェクトを取得
         const bullets = this.objects.filter(obj => obj instanceof Bullet && obj.isAlive) as Bullet[]
-        const enemies = this.objects.filter(obj => (obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive) as (Enemy | SniperEnemy)[]
+        const enemies = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) as (Fighter | MissileFlower)[]
 
         // レーザーの当たり判定（発射中のみ判定）
         if (this.laser.state === LaserState.FIRING) {
@@ -656,7 +656,7 @@ export class GameManager {
                     this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffffff, enemy.velocity.x, enemy.velocity.y)
                     if (!enemy.isAlive) {
                         this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
-                        if (enemy instanceof SniperEnemy) {
+                        if (enemy instanceof MissileFlower) {
                             this.addScore(1000)
                         } else {
                             this.addScore(300)
@@ -682,7 +682,7 @@ export class GameManager {
                         if (!enemy.isAlive) {
                             this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
                             // 撃破加点
-                            if (enemy instanceof SniperEnemy) {
+                            if (enemy instanceof MissileFlower) {
                                 this.addScore(1000)
                             } else {
                                 this.addScore(300)
@@ -804,8 +804,8 @@ export class GameManager {
                 }
             }
 
-            // 敵機（Enemy, SniperEnemy）との衝突
-            const enemies = this.objects.filter(obj => (obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive) as (Enemy | SniperEnemy)[]
+            // 敵機（Enemy, MissileFlower）との衝突
+            const enemies = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) as (Fighter | MissileFlower)[]
             for (const enemy of enemies) {
                 if (this.hitTest(ex, enemy)) {
                     if (ex.canDealDamage(enemy)) {
@@ -815,7 +815,7 @@ export class GameManager {
                         // 誘爆による撃破加点
                         if (!enemy.isAlive) {
                             this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
-                            if (enemy instanceof SniperEnemy) {
+                            if (enemy instanceof MissileFlower) {
                                 this.addScore(200)
                             } else {
                                 this.addScore(100)

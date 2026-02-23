@@ -1,16 +1,16 @@
 import { Graphics } from 'pixi.js'
-import { GameObject } from './GameObject'
-import type { Player, SpawnBulletFn } from './Player'
-import { HomingMissile } from './HomingMissile'
+import { GameObject } from '../GameObject'
+import type { Player, SpawnBulletFn } from '../Player'
+import { HomingMissile } from '../HomingMissile'
 
 export type SpawnHomingMissileFn = (x: number, y: number, angle: number) => void
 
 /**
- * 青四角の敵（旧スナイパー型）
+ * ミサイルフラワー（旧スナイパー型）
  *
  * 自機から一定距離を保ちながら、8方向に誘導ミサイルを発射する。
  */
-export class SniperEnemy extends GameObject {
+export class MissileFlower extends GameObject {
     /** 移動速度 */
     public speed: number = 6
 
