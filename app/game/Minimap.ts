@@ -13,7 +13,7 @@ export class Minimap {
     public display: Container = new Container()
     private bg: Graphics = new Graphics()
     private mapGraphics: Graphics = new Graphics()
-    private size: number = 160 // 表示サイズ (px)
+    private size: number = 320 // 表示サイズ (px)
     private range: number = 4000 // マップでカバーするワールド範囲 (+/- range)
 
     constructor() {
@@ -44,40 +44,40 @@ export class Minimap {
             return { x: mx, y: my }
         }
 
-        // 1. 弾・誘導弾 (1x1) - レーザーは除外
+        // 1. 弾・誘導弾 (2x2) - レーザーは除外
         for (const obj of objects) {
             if (!obj.isAlive) continue
 
             if (obj instanceof Bullet) {
                 const pos = toMap(obj.position.x, obj.position.y)
                 if (this.isInMap(pos.x, pos.y)) {
-                    this.mapGraphics.rect(pos.x, pos.y, 1, 1)
+                    this.mapGraphics.rect(pos.x - 1, pos.y - 1, 2, 2)
                     this.mapGraphics.fill({ color: 0xffffff })
                 }
             } else if (obj instanceof HomingMissile) {
                 const pos = toMap(obj.position.x, obj.position.y)
                 if (this.isInMap(pos.x, pos.y)) {
-                    this.mapGraphics.rect(pos.x, pos.y, 1, 1)
+                    this.mapGraphics.rect(pos.x - 1, pos.y - 1, 2, 2)
                     this.mapGraphics.fill({ color: 0x00ffff }) // 誘導弾はシアン
                 }
             }
         }
 
-        // 2. 敵機 (2x2, 赤)
+        // 2. 敵機 (4x4, 赤)
         for (const obj of objects) {
             if ((obj instanceof Enemy || obj instanceof SniperEnemy) && obj.isAlive) {
                 const pos = toMap(obj.position.x, obj.position.y)
                 if (this.isInMap(pos.x, pos.y)) {
-                    this.mapGraphics.rect(pos.x - 1, pos.y - 1, 2, 2)
+                    this.mapGraphics.rect(pos.x - 2, pos.y - 2, 4, 4)
                     this.mapGraphics.fill({ color: 0xff3333 })
                 }
             }
         }
 
-        // 3. 自機 (2x2, シアン)
+        // 3. 自機 (4x4, シアン) - 目立つように大きめ
         const pPos = toMap(player.position.x, player.position.y)
         if (this.isInMap(pPos.x, pPos.y)) {
-            this.mapGraphics.rect(pPos.x - 1, pPos.y - 1, 2, 2)
+            this.mapGraphics.rect(pPos.x - 2, pPos.y - 2, 4, 4)
             this.mapGraphics.fill({ color: 0x00ffff })
         }
     }

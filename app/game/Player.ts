@@ -46,7 +46,7 @@ export class Player extends GameObject {
     public screenHeight: number = 0
 
     /** 当たり判定半径 */
-    public override radius: number = 15
+    public override radius: number = 16
 
     /** 所属サイド */
     public override side: 'player' | 'enemy' = 'player'
@@ -75,11 +75,12 @@ export class Player extends GameObject {
 
     private createGraphics(): void {
         const body = new Graphics()
-        // 先端が上向きの三角形
+        // 鏃（やじり）型の形状
         body.poly([
-            0, -20,
-            15, 15,
-            -15, 15
+            0, -22,
+            16, 18,
+            0, 8,
+            -16, 18
         ])
         body.fill({ color: 0x00ffff })
         // 縁取り

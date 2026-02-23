@@ -406,7 +406,7 @@ export class GameManager {
      * ミニマップの位置を右上に更新
      */
     private updateMinimapPosition(): void {
-        this.minimap.setPosition(this.screenWidth - 180, 20)
+        this.minimap.setPosition(this.screenWidth - 340, 20)
     }
 
     /**

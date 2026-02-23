@@ -40,7 +40,7 @@ export class SniperEnemy extends GameObject {
     constructor(x: number, y: number, player: Player, spawnHomingMissile: SpawnHomingMissileFn) {
         super(x, y)
         this.side = 'enemy'
-        this.radius = 24
+        this.radius = 36
         this.player = player
         this.spawnHomingMissile = spawnHomingMissile
 
