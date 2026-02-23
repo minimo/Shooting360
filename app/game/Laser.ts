@@ -22,6 +22,9 @@ export class Laser extends GameObject {
     private afterimageCount: number = 5
     private rotationHistory: number[] = []
 
+    /** レーザーの基本太さ */
+    public thickness: number = 4
+
     private coreGraphics: Graphics = new Graphics()
     private glowGraphics: Graphics = new Graphics()
     // 残像用のグラフィックスリスト
@@ -82,12 +85,15 @@ export class Laser extends GameObject {
             }
 
             // メインレーザー
+            const halfW = this.thickness * 2 // 外側は少し太めに設計されていた(元8*2=16)
+            const coreW = this.thickness * 0.75 // 内側は少し細めに設計されていた(元3*2=6)
+
             // 外側の光
-            this.glowGraphics.rect(-8, -this.maxLength, 16, this.maxLength)
+            this.glowGraphics.rect(-halfW, -this.maxLength, halfW * 2, this.maxLength)
             this.glowGraphics.fill({ color: this.color, alpha: 0.4 })
 
             // 内側の芯
-            this.coreGraphics.rect(-3, -this.maxLength, 6, this.maxLength)
+            this.coreGraphics.rect(-coreW, -this.maxLength, coreW * 2, this.maxLength)
             this.coreGraphics.fill({ color: 0xffffff, alpha: 1.0 })
         }
     }

@@ -26,18 +26,52 @@
         </div>
       </div>
     </div>
+
+    <!-- パワーアップ選択画面 -->
+    <div v-if="showPowerUp" class="overlay powerup-overlay">
+      <div class="overlay-content">
+        <h2 class="powerup-title">WAVE CLEAR!</h2>
+        <p>強化項目を一つ選択してください</p>
+        <div class="powerup-options">
+          <div 
+            v-for="(option, index) in powerUpOptions" 
+            :key="option.id" 
+            class="powerup-card"
+            :class="{ selected: index === selectedIndex }"
+            @click="selectPowerUp(index)"
+            @mouseenter="selectedIndex = index"
+          >
+            <h3>{{ option.name }}</h3>
+            <p>{{ option.description }}</p>
+            <div v-if="index === selectedIndex" class="select-hint">PRESS ENTER</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ポーズ画面 -->
+    <div v-if="isPaused" class="overlay pause-overlay">
+      <div class="overlay-content">
+        <h2 class="pause-title">PAUSE</h2>
+        <p>ESC キーで再開</p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Application, Ticker } from 'pixi.js'
 import { GameManager } from '~/game/GameManager'
-import { useInput } from '~/composables/useInput'
+import { useInput, type InputState } from '~/composables/useInput'
 
 const gameContainer = ref<HTMLDivElement | null>(null)
 const showOverlay = ref(true)
 const showGameOver = ref(false)
+const showPowerUp = ref(false)
+const isPaused = ref(false)
+const selectedIndex = ref(0)
+const powerUpOptions = ref<any[]>([])
 
 // --- Input ---
 const input = useInput()
@@ -55,7 +89,21 @@ const gameLoop = (time: Ticker) => {
         window.addEventListener('keydown', restartOnKey)
       }, 500)
     }
-    gameManager.update(time.deltaTime, input.state)
+    // パワーアップ選択中またはオーバーレイ表示中は自機の操作入力を遮断する
+    const effectiveInput = (showPowerUp.value || showOverlay.value || showGameOver.value) 
+      ? { up: false, down: false, left: false, right: false, shoot: false, laser: false, boost: false }
+      : input.state
+
+    gameManager.update(time.deltaTime, effectiveInput as InputState)
+    
+    // パワーアップ状態の同期
+    showPowerUp.value = gameManager.isPowerUpSelecting
+    if (showPowerUp.value) {
+      powerUpOptions.value = gameManager.currentPowerUpOptions
+    }
+
+    // ポーズ状態の同期
+    isPaused.value = gameManager.isPaused
   }
 }
 
@@ -82,6 +130,49 @@ const restartOnKey = () => {
   }
 }
 
+// パワーアップ選択
+const selectPowerUp = (index: number) => {
+  if (gameManager) {
+    gameManager.selectPowerUp(index)
+    showPowerUp.value = false
+  }
+}
+
+// パワーアップ選択用のキーボード操作
+const handlePowerUpKey = (e: KeyboardEvent) => {
+  if (!showPowerUp.value) return
+
+  if (e.key === 'ArrowLeft' || e.key === 'Left') {
+    selectedIndex.value = (selectedIndex.value - 1 + powerUpOptions.value.length) % powerUpOptions.value.length
+  } else if (e.key === 'ArrowRight' || e.key === 'Right') {
+    selectedIndex.value = (selectedIndex.value + 1) % powerUpOptions.value.length
+  } else if (e.key === 'Enter' || e.key === ' ') {
+    selectPowerUp(selectedIndex.value)
+  }
+}
+
+// ポーズ用のキーボード操作
+const handlePauseKey = (e: KeyboardEvent) => {
+  // オーバーレイやゲームオーバー時は無視
+  if (showOverlay.value || showGameOver.value || showPowerUp.value) return
+  
+  if (e.key === 'Escape') {
+    if (gameManager) {
+      gameManager.isPaused = !gameManager.isPaused
+      isPaused.value = gameManager.isPaused
+    }
+  }
+}
+
+watch(showPowerUp, (val) => {
+  if (val) {
+    selectedIndex.value = 0
+    window.addEventListener('keydown', handlePowerUpKey)
+  } else {
+    window.removeEventListener('keydown', handlePowerUpKey)
+  }
+})
+
 // 固定解像度
 const GAME_WIDTH = 1920
 const GAME_HEIGHT = 1080
@@ -102,6 +193,8 @@ onMounted(async () => {
 
   // タイトル画面用の入力待ち
   window.addEventListener('keydown', startOnKey)
+  // ポーズ用の入力待ち
+  window.addEventListener('keydown', handlePauseKey)
 
   // --- Pixi Application 初期化 (固定解像度 1920×1080) ---
   app = new Application()
@@ -131,6 +224,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('keydown', startOnKey)
   window.removeEventListener('keydown', restartOnKey)
+  window.removeEventListener('keydown', handlePauseKey)
   window.removeEventListener('resize', fitCanvas)
   if (gameManager) {
     gameManager.destroy()
@@ -222,5 +316,90 @@ onUnmounted(() => {
   font-size: 1.1rem;
   color: #ccc;
   margin: 0.4rem 0;
+}
+
+/* パワーアップUI */
+.powerup-overlay {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.powerup-title {
+  font-size: 3rem !important;
+  color: #ffff00 !important;
+  text-shadow: 0 0 30px rgba(255, 255, 0, 0.5) !important;
+  margin-bottom: 2rem !important;
+}
+
+.powerup-options {
+  display: flex;
+  gap: 20px;
+  margin-top: 2rem;
+  justify-content: center;
+}
+
+.powerup-card {
+  width: 280px;
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border: 2px solid rgba(0, 255, 204, 0.3);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.powerup-card:hover, .powerup-card.selected {
+  transform: translateY(-10px);
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.2) 0%, rgba(0, 255, 204, 0.1) 100%);
+  border-color: #00ffcc;
+  box-shadow: 0 10px 30px rgba(0, 255, 204, 0.3);
+}
+
+.powerup-card.selected {
+  border-width: 3px;
+  animation: pulse-border 1.5s infinite;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(0, 255, 204, 0.6); }
+  100% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
+}
+
+.select-hint {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: #00ffcc;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.powerup-card h3 {
+  color: #00ffcc;
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+}
+
+.powerup-card p {
+  color: #eee !important;
+  font-size: 0.95rem !important;
+  line-height: 1.4;
+}
+
+/* ポーズUI */
+.pause-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.pause-title {
+  font-size: 4rem !important;
+  color: #fff !important;
+  letter-spacing: 0.5rem;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5) !important;
+  margin-bottom: 1rem !important;
 }
 </style>

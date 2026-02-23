@@ -14,6 +14,13 @@ import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
 import type { InputState } from '~/composables/useInput'
 import { Gauge } from './Gauge'
 
+export interface PowerUp {
+    id: string
+    name: string
+    description: string
+    effect: (gm: GameManager) => void
+}
+
 /**
  * ゲーム全体の状態を管理するマネージャー
  */
@@ -47,12 +54,20 @@ export class GameManager {
     private isWaitingForNextWave: boolean = false
     private waveTransitionTimer: number = 0
 
+    // パワーアップ
+    public isPowerUpSelecting: boolean = false
+    public currentPowerUpOptions: PowerUp[] = []
+    private availablePowerUps: PowerUp[] = []
+
     // スポーンタイマー
     private enemySpawnTimer: number = 0
     private enemySpawnInterval: number = 120 // フレーム単位
 
     /** ゲームがアクティブ（開始済み）かどうか */
     public isGameActive: boolean = false
+
+    /** ポーズ中かどうか */
+    public isPaused: boolean = false
 
     public get stage(): Container {
         return this.mainContainer
@@ -136,6 +151,21 @@ export class GameManager {
         }
 
         this.updateMinimapPosition()
+        this.initPowerUps()
+    }
+
+    private initPowerUps(): void {
+        this.availablePowerUps = [
+            { id: 'hp_up', name: 'HP上限アップ', description: '最大HPが5増加し、全回復します', effect: (gm) => { gm.player.maxHp += 5; gm.player.hp = gm.player.maxHp } },
+            { id: '3way', name: '3-Way Shot', description: 'メイン武器が3方向に発射されます', effect: (gm) => { gm.player.weaponType = '3way' } },
+            { id: '5way', name: '5-Way Shot', description: 'メイン武器が5方向に発射されます', effect: (gm) => { gm.player.weaponType = '5way' } },
+            { id: 'wide', name: 'Wide Shot', description: 'メイン武器が並列に5発発射されます', effect: (gm) => { gm.player.weaponType = 'wide' } },
+            { id: 'laser_dmg', name: 'レーザー威力アップ', description: 'レーザーのダメージが1.5倍になります', effect: (gm) => { gm.player.laserDamageMultiplier *= 1.5 } },
+            { id: 'laser_width', name: 'レーザー太さアップ', description: 'レーザーが太くなり、当たり判定が広がります', effect: (gm) => { gm.player.laserWidthMultiplier *= 1.4 } },
+            { id: 'laser_power_max', name: 'パワー上限アップ', description: 'レーザーパワーの最大値が100増加します', effect: (gm) => { gm.player.maxLaserPower += 100; gm.player.laserPower = gm.player.maxLaserPower } },
+            { id: 'laser_recovery', name: 'パワー回復回復量アップ', description: 'レーザーパワーの回復速度が1.5倍になります', effect: (gm) => { gm.player.laserPowerRecoveryMultiplier *= 1.5 } },
+            { id: 'laser_eco', name: 'パワー消費量軽減', description: 'レーザーとブーストのパワー消費が20%軽減されます', effect: (gm) => { gm.player.laserConsumptionMultiplier *= 0.8 } },
+        ]
     }
 
     /**
@@ -233,6 +263,37 @@ export class GameManager {
         }
     }
 
+    public generatePowerUpOptions(): void {
+        const options: PowerUp[] = []
+        const pool = [...this.availablePowerUps]
+
+        // すでに持っている武器タイプは除外するなどの調整も可能だが、
+        // 今回はシンプルにランダムに3つ選ぶ
+        for (let i = 0; i < 3; i++) {
+            if (pool.length === 0) break
+            const index = Math.floor(Math.random() * pool.length)
+            const powerUp = pool.splice(index, 1)[0]
+            if (powerUp) {
+                options.push(powerUp)
+            }
+        }
+        this.currentPowerUpOptions = options
+        this.isPowerUpSelecting = true
+    }
+
+    public selectPowerUp(index: number): void {
+        const powerUp = this.currentPowerUpOptions[index]
+        if (powerUp) {
+            powerUp.effect(this)
+            this.isPowerUpSelecting = false
+            this.currentPowerUpOptions = []
+
+            // 選択後、次のWaveへ
+            this.isWaitingForNextWave = true
+            this.showAnnouncement('', 60) // 1秒間だけ表示なし（ウェイト）
+        }
+    }
+
     private showAnnouncement(text: string, duration: number): void {
         if (!this.announcementText) return
         this.announcementText.text = text
@@ -261,10 +322,9 @@ export class GameManager {
                 this.isWaitingForClearAnnouncement = false
                 this.clearWave()
             } else if (this.isWaveClearing) {
-                // CLEAR表示終了 -> 1秒待機へ
+                // CLEAR表示終了 -> パワーアップ選択へ
                 this.isWaveClearing = false
-                this.isWaitingForNextWave = true
-                this.showAnnouncement('', 60) // 何も表示せず1秒待機
+                this.generatePowerUpOptions()
             } else if (previousText.includes('START')) {
                 // START表示終了 -> 敵出現前の3秒待機へ
                 this.isSpawningDelayed = true
@@ -301,6 +361,7 @@ export class GameManager {
      * 毎フレーム更新
      */
     public update(delta: number, input: InputState): void {
+        if (this.isPaused) return
         if (this.isGameOver) return
 
         // --- ゲームオーバー（自機破壊）演出中 ---
@@ -412,6 +473,7 @@ export class GameManager {
 
         this.player.update(delta, input)
         this.laser.updateFromPlayer(this.player.position.x, this.player.position.y, this.player.rotation)
+        this.laser.thickness = 4 * this.player.laserWidthMultiplier
         this.laser.setTrigger(laserTrigger)
 
         // --- レーザー演出（パーティクル） ---
@@ -487,8 +549,8 @@ export class GameManager {
                 }
             }
 
-            // クリア判定: 規定数スポーン済み & 生存敵ゼロ
-            if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isWaitingForNextWave && this.waveEnemiesSpawned >= this.totalEnemiesInWave) {
+            // クリア判定: 規定数スポーン済み & 生存敵ゼロ (アナウンス表示中やパワーアップ選択中は除外)
+            if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isWaitingForNextWave && !this.isPowerUpSelecting && this.waveTransitionTimer <= 0 && this.waveEnemiesSpawned >= this.totalEnemiesInWave && this.totalEnemiesInWave > 0) {
                 const enemyCount = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive).length
                 if (enemyCount === 0) {
                     // 全滅後、3秒待機してからクリアアナウンスを出す
@@ -652,7 +714,7 @@ export class GameManager {
             const end = this.laser.getEndPoint()
             for (const enemy of enemies) {
                 if (this.lineCircleTest(start.x, start.y, end.x, end.y, enemy.position.x, enemy.position.y, enemy.radius)) {
-                    enemy.takeDamage(10) // レーザーを一撃必殺（威力10）に強化
+                    enemy.takeDamage(10 * this.player.laserDamageMultiplier) // 倍率適用
                     this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffffff, enemy.velocity.x, enemy.velocity.y)
                     if (!enemy.isAlive) {
                         this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
@@ -890,6 +952,10 @@ export class GameManager {
      * 線分と円の当たり判定
      */
     private lineCircleTest(x1: number, y1: number, x2: number, y2: number, cx: number, cy: number, r: number): boolean {
+        // レーザーの基本幅 4px に倍率を適用 (当たり判定は少し余裕を持たせる)
+        const laserW = 4 * this.player.laserWidthMultiplier
+        const combinedR = r + laserW
+
         // 円の中心(cx, cy)を始点(x1, y1)からの最短経路上の座標に補正する
         let dcx = cx - x1
         let dcy = cy - y1
@@ -913,7 +979,7 @@ export class GameManager {
         const closestX = x1 + t * dx
         const closestY = y1 + t * dy
         const distSq = (correctedCx - closestX) ** 2 + (correctedCy - closestY) ** 2
-        return distSq < r * r
+        return distSq < combinedR * combinedR
     }
 
     /**

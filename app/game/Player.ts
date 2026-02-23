@@ -26,6 +26,15 @@ export class Player extends GameObject {
     public isBoosting: boolean = false
     public powerGauge: Gauge
 
+    /** 武器タイプ */
+    public weaponType: 'normal' | '3way' | '5way' | 'wide' = 'normal'
+
+    /** ステータス倍率 */
+    public laserDamageMultiplier: number = 1.0
+    public laserWidthMultiplier: number = 1.0
+    public laserPowerRecoveryMultiplier: number = 1.0
+    public laserConsumptionMultiplier: number = 1.0
+
     /** 加速度 */
     public acceleration: number = 0.675
 
@@ -181,7 +190,7 @@ export class Player extends GameObject {
         // --- 射撃 (Z) ---
         this.fireCooldown -= delta
         if (input.shoot && this.fireCooldown <= 0) {
-            this.spawnBullet(this.position.x, this.position.y, this.rotation, 'player')
+            this.shoot()
             this.fireCooldown = this.fireInterval
         }
 
@@ -194,12 +203,45 @@ export class Player extends GameObject {
     }
 
     /**
+     * 武器タイプに応じた射撃
+     */
+    private shoot(): void {
+        const x = this.position.x
+        const y = this.position.y
+        const rotation = this.rotation
+
+        switch (this.weaponType) {
+            case 'normal':
+                this.spawnBullet(x, y, rotation, 'player')
+                break
+            case '3way':
+                for (let i = -1; i <= 1; i++) {
+                    this.spawnBullet(x, y, rotation + i * 0.2, 'player')
+                }
+                break
+            case '5way':
+                for (let i = -2; i <= 2; i++) {
+                    this.spawnBullet(x, y, rotation + i * 0.2, 'player')
+                }
+                break
+            case 'wide':
+                for (let i = -2; i <= 2; i++) {
+                    // 少し横にずらして発射
+                    const offsetX = Math.cos(rotation) * i * 10
+                    const offsetY = Math.sin(rotation) * i * 10
+                    this.spawnBullet(x + offsetX, y + offsetY, rotation, 'player')
+                }
+                break
+        }
+    }
+
+    /**
      * パワーの消費と回復
      */
     public updateLaserPower(delta: number, isFiring: boolean, isBoosting: boolean): void {
         if ((isFiring || isBoosting) && !this.isLaserOverheated) {
             // 消費：秒間200 (200/60 per frame) -> 1.5秒で300消費 (以前の2倍)
-            this.laserPower -= (200 / 60) * delta
+            this.laserPower -= (200 / 60) * delta * this.laserConsumptionMultiplier
             if (this.laserPower <= 0) {
                 this.laserPower = 0
                 this.isLaserOverheated = true // オーバーヒート発生
@@ -208,7 +250,7 @@ export class Player extends GameObject {
             this.powerGauge.setValue(this.laserPower)
         } else if (this.laserPower < this.maxLaserPower) {
             // 回復：秒間20 (秒間10の2倍。60fpsなら3フレームに1回1増える)
-            this.powerRecoveryCounter += delta
+            this.powerRecoveryCounter += delta * this.laserPowerRecoveryMultiplier
             if (this.powerRecoveryCounter >= 3) {
                 this.laserPower += Math.floor(this.powerRecoveryCounter / 3)
                 this.powerRecoveryCounter %= 3
