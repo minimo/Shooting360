@@ -4,7 +4,7 @@
     <div v-if="showOverlay" class="overlay">
       <div class="overlay-content">
         <h2>🎮 Shooting 360</h2>
-        <p>何かキーを押してスタート</p>
+        <p>Z / X キーでスタート</p>
         <div class="controls">
           <ul>
             <li>⬅️➡️: 回転</li>
@@ -22,7 +22,7 @@
         <h2 class="game-over-text">GAME OVER</h2>
         <p>Your ship was destroyed.</p>
         <div class="controls">
-          <p style="font-size: 1.2rem; margin: 0; color: #fff;">何かキーを押してリスタート</p>
+          <p style="font-size: 1.2rem; margin: 0; color: #fff;">Z / X キーでリスタート</p>
         </div>
       </div>
     </div>
@@ -59,9 +59,9 @@ const gameLoop = (time: Ticker) => {
   }
 }
 
-// キー入力でスタートするハンドラ
-const startOnKey = () => {
-  if (showOverlay.value && gameManager) {
+// キー入力でスタートするハンドラ（Z or X キーのみ）
+const startOnKey = (e: KeyboardEvent) => {
+  if (showOverlay.value && gameManager && (e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X')) {
     showOverlay.value = false
     gameManager.isGameActive = true
     window.removeEventListener('keydown', startOnKey)

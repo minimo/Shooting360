@@ -58,7 +58,9 @@ export class GameManager {
 
         this.objects = []
         this.isGameOver = false
-        this.isGameActive = true
+        this.isGameActive = false // タイトル画面中は停止
+        this.mainContainer.visible = false
+        this.uiContainer.visible = false
         this.gameOverTimer = 0
         this.score = 0 // スコアリセット
         this.hasTriggeredMassiveExplosion = false
@@ -169,6 +171,13 @@ export class GameManager {
      */
     public update(delta: number, input: InputState): void {
         if (this.isGameOver) return
+        if (!this.isGameActive) return // タイトル画面中は停止
+
+        // ゲーム開始時にコンテナを表示
+        if (!this.mainContainer.visible) {
+            this.mainContainer.visible = true
+            this.uiContainer.visible = true
+        }
 
         // --- ゲームオーバー（自機破壊）演出中 ---
         if (!this.player.isAlive && !this.isGameOver) {
