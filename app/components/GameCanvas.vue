@@ -82,20 +82,35 @@ const restartOnKey = () => {
   }
 }
 
+// 固定解像度
+const GAME_WIDTH = 1920
+const GAME_HEIGHT = 1080
+
+const fitCanvas = () => {
+  if (!gameContainer.value) return
+  const wrapperW = window.innerWidth
+  const wrapperH = window.innerHeight
+  const scale = Math.min(wrapperW / GAME_WIDTH, wrapperH / GAME_HEIGHT)
+  const container = gameContainer.value
+  container.style.width = `${GAME_WIDTH}px`
+  container.style.height = `${GAME_HEIGHT}px`
+  container.style.transform = `translate(-50%, -50%) scale(${scale})`
+}
+
 onMounted(async () => {
   if (!gameContainer.value) return
 
   // タイトル画面用の入力待ち
   window.addEventListener('keydown', startOnKey)
 
-  // --- Pixi Application 初期化 ---
+  // --- Pixi Application 初期化 (固定解像度 1920×1080) ---
   app = new Application()
   await app.init({
-    resizeTo: gameContainer.value,
+    width: GAME_WIDTH,
+    height: GAME_HEIGHT,
     backgroundColor: 0x050510,
     antialias: true,
-    resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
+    resolution: 1,
   })
 
   gameContainer.value.appendChild(app.canvas)
@@ -103,21 +118,20 @@ onMounted(async () => {
   // --- GameManager 初期化 ---
   gameManager = new GameManager()
   gameManager.init(app)
+  gameManager.resize(GAME_WIDTH, GAME_HEIGHT)
+
   // --- メインループ ---
   app.ticker.add(gameLoop)
 
-  // --- リサイズ対応 ---
-  const onResize = () => {
-    if (app && gameManager) {
-      gameManager.resize(app.screen.width, app.screen.height)
-    }
-  }
-  window.addEventListener('resize', onResize)
+  // --- 初回フィット + リサイズ対応 ---
+  fitCanvas()
+  window.addEventListener('resize', fitCanvas)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', startOnKey)
   window.removeEventListener('keydown', restartOnKey)
+  window.removeEventListener('resize', fitCanvas)
   if (gameManager) {
     gameManager.destroy()
     gameManager = null
@@ -137,13 +151,15 @@ onUnmounted(() => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #0a0a1a;
+  background: #000;
 }
 
 .game-container {
-  width: 100%;
-  height: 100%;
-  cursor: none; /* マウスを使わないため非表示へ */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center center;
+  cursor: none;
 }
 
 .game-container canvas {
