@@ -12,6 +12,7 @@ import { HomingMissile } from './HomingMissile'
 import { HomingExplosion } from './HomingExplosion'
 import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
 import type { InputState } from '~/composables/useInput'
+import { Gauge } from './Gauge'
 
 /**
  * ゲーム全体の状態を管理するマネージャー
@@ -26,7 +27,7 @@ export class GameManager {
     private screenWidth: number = 0
     private screenHeight: number = 0
     private uiContainer: Container = new Container()
-    private hpGauge: Graphics = new Graphics()
+    private hpGauge: Gauge | null = null
     private shakeFrames: number = 0
     public isGameOver: boolean = false
     private gameOverTimer: number = 0
@@ -66,7 +67,6 @@ export class GameManager {
 
         // --- UI Container ---
         this.app.stage.addChild(this.uiContainer)
-        this.uiContainer.addChild(this.hpGauge)
 
         this.objects = []
         this.isGameOver = false
@@ -111,6 +111,21 @@ export class GameManager {
         this.player.screenWidth = this.screenWidth
         this.player.screenHeight = this.screenHeight
         this.mainContainer.addChild(this.player.display)
+
+        // --- HP Gauge ---
+        this.hpGauge = new Gauge({
+            width: 400,
+            height: 20,
+            maxValue: this.player.maxHp,
+            colorThresholds: [
+                { threshold: 0.3, color: 0xff0000 },
+                { threshold: 0.5, color: 0xffff00 },
+                { threshold: 0.75, color: 0x00ff00 }
+            ]
+        })
+        this.hpGauge.x = this.screenWidth / 2
+        this.hpGauge.y = 30
+        this.uiContainer.addChild(this.hpGauge)
 
         // --- Background ---
         // ワールドが2倍（面積4倍）になったため、密度を維持するために数を4倍(50->200)に増やす
@@ -209,6 +224,13 @@ export class GameManager {
         if (this.isWaveClearing) return
         this.isWaveClearing = true
         this.showAnnouncement(`WAVE ${this.currentWave} CLEAR`, 240) // 4秒表示
+
+        // Waveクリア時の回復 (HP 50%回復, パワー全回復)
+        if (this.player.isAlive) {
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.maxHp * 0.5)
+            this.player.laserPower = this.player.maxLaserPower
+            this.player.isLaserOverheated = false // オーバーヒートも強制解除
+        }
     }
 
     private showAnnouncement(text: string, duration: number): void {
@@ -379,8 +401,8 @@ export class GameManager {
 
         // 1. Player更新 (レーザーのパワー消費・回復)
         const isLaserFiring = this.laser.state === LaserState.FIRING
-        // ブーストのパワー消費は Player.update 内で単発的に行われるようになったため、ここでは false を渡す
-        this.player.updateLaserPower(delta, isLaserFiring, false)
+        // 消費状態を正しく渡す
+        this.player.updateLaserPower(delta, isLaserFiring, this.player.isBoosting)
 
         // パワーが切れた、またはオーバーヒート冷却中ならレーザーを強制停止
         let laserTrigger = input.laser
@@ -513,23 +535,10 @@ export class GameManager {
         this.minimap.update(this.player, this.objects)
 
         // 7. HPゲージ更新
-        this.drawHpGauge()
-    }
-
-    private drawHpGauge(): void {
-        this.hpGauge.clear()
-        // 背景
-        this.hpGauge.rect(this.screenWidth / 2 - 100, 20, 200, 20)
-        this.hpGauge.fill({ color: 0x333333, alpha: 0.8 })
-
-        const ratio = Math.max(0, this.player.hp / this.player.maxHp)
-        let color = 0x00ffff // Default: Blue
-        if (ratio < 0.3) color = 0xff0000 // Red
-        else if (ratio < 0.5) color = 0xffff00 // Yellow
-        else if (ratio < 0.75) color = 0x00ff00 // Green
-
-        this.hpGauge.rect(this.screenWidth / 2 - 100, 20, 200 * ratio, 20)
-        this.hpGauge.fill({ color, alpha: 1 })
+        if (this.hpGauge) {
+            this.hpGauge.setValue(this.player.hp)
+            this.hpGauge.update(delta)
+        }
     }
 
     /**
@@ -563,6 +572,10 @@ export class GameManager {
         if (this.announcementText) {
             this.announcementText.x = width / 2
             this.announcementText.y = height / 2 - 150 // 少し上に上げる
+        }
+
+        if (this.hpGauge) {
+            this.hpGauge.x = width / 2
         }
 
         this.updateMinimapPosition()

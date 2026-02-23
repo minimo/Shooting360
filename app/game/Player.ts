@@ -1,5 +1,6 @@
 import { Graphics, Container } from 'pixi.js'
 import { GameObject } from './GameObject'
+import { Gauge } from './Gauge'
 import type { InputState } from '~/composables/useInput'
 
 /** 弾発射コールバック型 */
@@ -23,7 +24,7 @@ export class Player extends GameObject {
     private boostTimer: number = 0
     private wasBoostKeyDown: boolean = false
     public isBoosting: boolean = false
-    private powerGauge: Graphics = new Graphics()
+    public powerGauge: Gauge
 
     /** 加速度 */
     public acceleration: number = 0.675
@@ -56,6 +57,18 @@ export class Player extends GameObject {
     constructor(x: number, y: number, spawnBullet: SpawnBulletFn) {
         super(x, y)
         this.spawnBullet = spawnBullet
+
+        this.powerGauge = new Gauge({
+            width: 40,
+            height: 4,
+            maxValue: this.maxLaserPower,
+            colorThresholds: [
+                { threshold: 0.3, color: 0xff0000 },
+                { threshold: 0.5, color: 0xffff00 },
+                { threshold: 0.75, color: 0x00ff00 }
+            ]
+        })
+
         this.createGraphics()
         this.display.addChild(this.powerGauge)
         this.display.visible = true
@@ -86,10 +99,9 @@ export class Player extends GameObject {
         this.display.addChild(body)
     }
 
-    /**
-     * 更新処理
-     */
     public override update(delta: number, input: any): void {
+        this.powerGauge.update(delta)
+
         // --- 死亡時の慣性移動 ---
         if (!this.isAlive) {
             // 入力を受け付けず、通常の減速より緩やかに流される (0.995)
@@ -173,8 +185,11 @@ export class Player extends GameObject {
             this.fireCooldown = this.fireInterval
         }
 
-        // --- パワー表示の更新 ---
+        // updateLaserPower は GameManager 側で呼ばれるため、ここでは不要（二重消費防止）
+        // ただし、blinkTimer はここで更新する必要がある
         this.blinkTimer += delta
+
+        this.powerGauge.setValue(this.laserPower)
         this.updatePowerUI()
     }
 
@@ -190,6 +205,7 @@ export class Player extends GameObject {
                 this.isLaserOverheated = true // オーバーヒート発生
             }
             this.powerRecoveryCounter = 0
+            this.powerGauge.setValue(this.laserPower)
         } else if (this.laserPower < this.maxLaserPower) {
             // 回復：秒間20 (秒間10の2倍。60fpsなら3フレームに1回1増える)
             this.powerRecoveryCounter += delta
@@ -200,6 +216,7 @@ export class Player extends GameObject {
                     this.laserPower = this.maxLaserPower
                     this.isLaserOverheated = false // 冷却完了（最大まで溜まった）
                 }
+                this.powerGauge.setValue(this.laserPower)
             }
         }
     }
@@ -208,8 +225,6 @@ export class Player extends GameObject {
      * 自機上のパワーゲージ描画
      */
     private updatePowerUI(): void {
-        this.powerGauge.clear()
-
         // 最大値の時は表示しない
         if (this.laserPower >= this.maxLaserPower) {
             this.powerGauge.visible = false
@@ -222,41 +237,17 @@ export class Player extends GameObject {
         // display(親)が rotation に合わせて回転しているので、逆回転をかけて常に上を向かせる
         this.powerGauge.rotation = -this.rotation
 
-        const width = 40
-        const height = 4
-        const ratio = Math.max(0, this.laserPower / this.maxLaserPower)
-
         // 自機から見て常に「画面の上(y=-35)」の位置に配置するための座標計算
-        // 親(display)の座標系が回転しているため、逆行列的に座標を振る
         const dist = 35
         this.powerGauge.x = -Math.sin(this.rotation) * dist
         this.powerGauge.y = -Math.cos(this.rotation) * dist
 
-        // 描画位置。 powerGauge 自体に回転がかかっているので、中心(0,0)から左にずらして描く
-        const gx = -width / 2
-        const gy = -height / 2 // 自身の中心を基準にする
-
-        // 背景
-        this.powerGauge.rect(gx, gy, width, height)
-        this.powerGauge.fill({ color: 0x333333, alpha: 0.8 })
-
-        // パワー残量
-        let color = 0x00ffff
-        let alpha = 1.0
-
+        // オーバーヒート中の点滅演出
         if (this.isLaserOverheated) {
-            // オーバーヒート中は赤固定で点滅
-            color = 0xff0000
-            // 0.2〜1.0 の範囲で点滅
-            alpha = 0.6 + Math.sin(this.blinkTimer * 0.3) * 0.4
+            this.powerGauge.alpha = 0.6 + Math.sin(this.blinkTimer * 0.3) * 0.4
         } else {
-            if (ratio < 0.3) color = 0xff0000
-            else if (ratio < 0.5) color = 0xffff00
-            else if (ratio < 0.75) color = 0x00ff00
+            this.powerGauge.alpha = 1.0
         }
-
-        this.powerGauge.rect(gx, gy, width * ratio, height)
-        this.powerGauge.fill({ color, alpha })
     }
 
     /**
