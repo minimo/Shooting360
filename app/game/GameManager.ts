@@ -171,13 +171,6 @@ export class GameManager {
      */
     public update(delta: number, input: InputState): void {
         if (this.isGameOver) return
-        if (!this.isGameActive) return // タイトル画面中は停止
-
-        // ゲーム開始時にコンテナを表示
-        if (!this.mainContainer.visible) {
-            this.mainContainer.visible = true
-            this.uiContainer.visible = true
-        }
 
         // --- ゲームオーバー（自機破壊）演出中 ---
         if (!this.player.isAlive && !this.isGameOver) {
@@ -185,7 +178,6 @@ export class GameManager {
             if (this.gameOverTimer <= 0) {
                 this.gameOverTimer = 180
                 this.hasTriggeredMassiveExplosion = false
-                this.isGameActive = false
                 this.spawnHitEffect(this.player.position.x, this.player.position.y, 0xffaa00, this.player.velocity.x, this.player.velocity.y)
                 this.shakeFrames = 30
             }
@@ -256,6 +248,14 @@ export class GameManager {
                 this.isGameOver = true
                 return
             }
+        }
+
+        if (!this.isGameActive) return // タイトル画面中は停止
+
+        // ゲーム開始時にコンテナを表示
+        if (!this.mainContainer.visible) {
+            this.mainContainer.visible = true
+            this.uiContainer.visible = true
         }
 
         // --- 画面シェイクエフェクト ---
