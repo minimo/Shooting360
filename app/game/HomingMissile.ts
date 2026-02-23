@@ -126,6 +126,7 @@ export class HomingMissile extends GameObject {
         if (distSq > this.maxDistance * this.maxDistance) {
             this.isAlive = false
             this.shouldExplode = true
+            this.isMaxDistanceExplosion = true
         }
 
         if (playerDistSq < 40 * 40) {
@@ -135,4 +136,6 @@ export class HomingMissile extends GameObject {
     }
 
     public shouldExplode: boolean = false
+    /** 最大飛距離到達による爆発かどうか */
+    public isMaxDistanceExplosion: boolean = false
 }

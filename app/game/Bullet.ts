@@ -35,12 +35,8 @@ export class Bullet extends GameObject {
      */
     private createGraphics(): void {
         const g = new Graphics()
-        // 細長い弾形状
-        g.poly([
-            { x: 0, y: -6 },
-            { x: -3, y: 4 },
-            { x: 3, y: 4 },
-        ])
+        // 細長い長方形の弾形状（高さ20px = 元の三角形の高さ10pxの2倍）
+        g.rect(-1.5, -5, 3, 10)
         g.fill({ color: 0xffff00, alpha: 1 })
         this.display.addChild(g)
     }

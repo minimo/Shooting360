@@ -161,8 +161,8 @@ export class GameManager {
     /**
      * ダメージ付き爆発生成
      */
-    private spawnHomingExplosion(x: number, y: number, vx: number = 0, vy: number = 0): void {
-        const explosion = new HomingExplosion(x, y, 2.25, 30, vx, vy)
+    private spawnHomingExplosion(x: number, y: number, vx: number = 0, vy: number = 0, scale: number = 2.25, duration: number = 30): void {
+        const explosion = new HomingExplosion(x, y, scale, duration, vx, vy)
         this.addObject(explosion)
     }
 
@@ -355,7 +355,12 @@ export class GameManager {
             // 誘導ミサイルが爆発フラグを立てていたら爆発を生成
             // (updateで立った場合も、衝突判定で立った場合もここで拾う)
             if (obj instanceof HomingMissile && obj.shouldExplode) {
-                this.spawnHomingExplosion(obj.position.x, obj.position.y, obj.velocity.x, obj.velocity.y)
+                if (obj.isMaxDistanceExplosion) {
+                    // 最大飛距離到達時は通常の1/4サイズ
+                    this.spawnHomingExplosion(obj.position.x, obj.position.y, obj.velocity.x, obj.velocity.y, 2.25 / 4, 30 / 4)
+                } else {
+                    this.spawnHomingExplosion(obj.position.x, obj.position.y, obj.velocity.x, obj.velocity.y)
+                }
                 obj.shouldExplode = false // 二重発生防止
             }
         }

@@ -94,16 +94,16 @@ export class Enemy extends GameObject {
         // --- 追尾ロジック ---
         let targetAngle = Math.atan2(dx, -dy)
 
-        // 回避ロジック：自機に当たりそうなほど近い場合 (150px未満)
-        if (dist < 150) {
+        // 回避ロジック：自機に当たりそうなほど近い場合 (80px未満)
+        if (dist < 80) {
             // プレイヤーから遠ざかる方向をターゲットにする (斥力)
             // offsetSignの方向に大きくハンドルを切る
-            const avoidanceStrength = 1.5 * (1 - dist / 150)
+            const avoidanceStrength = 1.5 * (1 - dist / 80)
             targetAngle += this.offsetSign * avoidanceStrength
         }
-        // 掠める挙動：中距離 (150px ~ 250px)
-        else if (dist < 250) {
-            const offsetWidth = 0.2 * (1 - dist / 250)
+        // 掠める挙動：中距離 (80px ~ 150px)
+        else if (dist < 150) {
+            const offsetWidth = 0.2 * (1 - dist / 150)
             targetAngle += this.offsetSign * offsetWidth
         }
 
