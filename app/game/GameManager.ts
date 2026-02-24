@@ -20,6 +20,7 @@ export interface PowerUp {
     name: string
     description: string
     effect: (gm: GameManager) => void
+    rarity?: number
 }
 
 /**
@@ -59,6 +60,7 @@ export class GameManager {
     public isPowerUpSelecting: boolean = false
     public currentPowerUpOptions: PowerUp[] = []
     private availablePowerUps: PowerUp[] = []
+    public rarityBonus: number = 0
 
     // スポーンタイマー
     private enemySpawnTimer: number = 0
@@ -107,6 +109,7 @@ export class GameManager {
         this.isWaitingForNextWave = false
         this.waveTransitionTimer = 0
         this.hasTriggeredMassiveExplosion = false
+        this.rarityBonus = 0
 
         // --- Minimap ---
         this.minimap = new Minimap()
@@ -183,15 +186,15 @@ export class GameManager {
 
     private initPowerUps(): void {
         this.availablePowerUps = [
-            { id: 'hp_up', name: 'HP上限アップ', description: '最大HPが5増加し、全回復します', effect: (gm) => { gm.player.maxHp += 5; gm.player.hp = gm.player.maxHp } },
-            { id: '3way', name: '3-Way Shot', description: 'メイン武器が3方向に発射されます', effect: (gm) => { gm.player.weaponType = '3way' } },
-            { id: '5way', name: '5-Way Shot', description: 'メイン武器が5方向に発射されます', effect: (gm) => { gm.player.weaponType = '5way' } },
-            { id: 'wide', name: 'Wide Shot', description: 'メイン武器が並列に5発発射されます', effect: (gm) => { gm.player.weaponType = 'wide' } },
-            { id: 'laser_dmg', name: 'レーザー威力アップ', description: 'レーザーのダメージが1.5倍になります', effect: (gm) => { gm.player.laserDamageMultiplier *= 1.5 } },
-            { id: 'laser_width', name: 'レーザー太さアップ', description: 'レーザーが太くなり、当たり判定が広がります', effect: (gm) => { gm.player.laserWidthMultiplier *= 1.4 } },
-            { id: 'laser_power_max', name: 'パワー上限アップ', description: 'レーザーパワーの最大値が100増加します', effect: (gm) => { gm.player.maxLaserPower += 100; gm.player.laserPower = gm.player.maxLaserPower } },
-            { id: 'laser_recovery', name: 'パワー回復回復量アップ', description: 'レーザーパワーの回復速度が1.5倍になります', effect: (gm) => { gm.player.laserPowerRecoveryMultiplier *= 1.5 } },
-            { id: 'laser_eco', name: 'パワー消費量軽減', description: 'レーザーとブーストのパワー消費が20%軽減されます', effect: (gm) => { gm.player.laserConsumptionMultiplier *= 0.8 } },
+            { id: 'hp_up', name: 'HP上限アップ', description: '最大HPが5増加し、全回復します', rarity: 1, effect: (gm) => { gm.player.maxHp += 5; gm.player.hp = gm.player.maxHp } },
+            { id: '3way', name: '3-Way Shot', description: 'メイン武器が3方向に発射されます', rarity: 2, effect: (gm) => { gm.player.weaponType = '3way' } },
+            { id: '5way', name: '5-Way Shot', description: 'メイン武器が5方向に発射されます', rarity: 3, effect: (gm) => { gm.player.weaponType = '5way' } },
+            { id: 'wide', name: 'Wide Shot', description: 'メイン武器が並列に5発発射されます', rarity: 3, effect: (gm) => { gm.player.weaponType = 'wide' } },
+            { id: 'laser_dmg', name: 'レーザー威力アップ', description: 'レーザーのダメージが1.5倍になります', rarity: 2, effect: (gm) => { gm.player.laserDamageMultiplier *= 1.5 } },
+            { id: 'laser_width', name: 'レーザー太さアップ', description: 'レーザーが太くなり、当たり判定が広がります', rarity: 1, effect: (gm) => { gm.player.laserWidthMultiplier *= 1.4 } },
+            { id: 'laser_power_max', name: 'パワー上限アップ', description: 'レーザーパワーの最大値が100増加します', rarity: 1, effect: (gm) => { gm.player.maxLaserPower += 100; gm.player.laserPower = gm.player.maxLaserPower } },
+            { id: 'laser_recovery', name: 'パワー回復回復量アップ', description: 'レーザーパワーの回復速度が1.5倍になります', rarity: 3, effect: (gm) => { gm.player.laserPowerRecoveryMultiplier *= 1.5 } },
+            { id: 'laser_eco', name: 'パワー消費量軽減', description: 'レーザーとブーストのパワー消費が20%軽減されます', rarity: 2, effect: (gm) => { gm.player.laserConsumptionMultiplier *= 0.8 } },
         ]
     }
 
@@ -286,16 +289,48 @@ export class GameManager {
         const options: PowerUp[] = []
         const pool = [...this.availablePowerUps]
 
-        // すでに持っている武器タイプは除外するなどの調整も可能だが、
-        // 今回はシンプルにランダムに3つ選ぶ
+        // ウェイト（確率）の計算
+        const getWeight = (rarity: number = 1): number => {
+            switch (rarity) {
+                case 1: return 100;
+                case 2: return 30 + this.rarityBonus * 20;
+                case 3: return 10 + this.rarityBonus * 15;
+                default: return 100;
+            }
+        }
+
         for (let i = 0; i < 3; i++) {
             if (pool.length === 0) break
-            const index = Math.floor(Math.random() * pool.length)
-            const powerUp = pool.splice(index, 1)[0]
+
+            const totalWeight = pool.reduce((sum, p) => sum + (p ? getWeight(p.rarity) : 0), 0)
+            let rand = Math.random() * totalWeight
+            let selectedIndex = 0
+
+            for (let j = 0; j < pool.length; j++) {
+                const item = pool[j]
+                if (!item) continue
+                rand -= getWeight(item.rarity)
+                if (rand <= 0) {
+                    selectedIndex = j
+                    break
+                }
+            }
+
+            const powerUp = pool.splice(selectedIndex, 1)[0]
             if (powerUp) {
                 options.push(powerUp)
             }
         }
+
+        // 「強化しない (Skip)」選択肢を追加
+        options.push({
+            id: 'skip',
+            name: '強化しない',
+            description: '次回の強化でレア度が高い項目が出やすくなります。',
+            rarity: 0,
+            effect: (gm) => { gm.rarityBonus += 1 }
+        })
+
         this.currentPowerUpOptions = options
         this.isPowerUpSelecting = true
     }
@@ -304,6 +339,12 @@ export class GameManager {
         const powerUp = this.currentPowerUpOptions[index]
         if (powerUp) {
             powerUp.effect(this)
+
+            // スキップ以外を選んだ場合、蓄積されたレア度ボーナスをリセット
+            if (powerUp.id !== 'skip') {
+                this.rarityBonus = 0
+            }
+
             this.isPowerUpSelecting = false
             this.currentPowerUpOptions = []
 

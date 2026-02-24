@@ -34,16 +34,30 @@
         <p class="powerup-subtitle">強化項目を選択してください</p>
         <div class="powerup-options">
           <div 
-            v-for="(option, index) in powerUpOptions" 
+            v-for="(option, index) in mainPowerUpOptions" 
             :key="option.id" 
             class="powerup-card"
             :class="{ selected: index === selectedIndex }"
             @click="selectPowerUp(index)"
             @mouseenter="selectedIndex = index"
           >
+            <div v-if="option.rarity && option.rarity > 0" class="rarity-stars">
+              {{ '★'.repeat(option.rarity) }}
+            </div>
             <h3>{{ option.name }}</h3>
             <p>{{ option.description }}</p>
           </div>
+        </div>
+
+        <div v-if="skipPowerUpOption" class="powerup-skip-container">
+          <button
+            class="powerup-skip-button"
+            :class="{ selected: powerUpOptions.length - 1 === selectedIndex }"
+            @click="selectPowerUp(powerUpOptions.length - 1)"
+            @mouseenter="selectedIndex = powerUpOptions.length - 1"
+          >
+            {{ skipPowerUpOption.name }}
+          </button>
         </div>
       </div>
     </div>
@@ -105,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, watch, computed } from 'vue'
 import { Application, Ticker } from 'pixi.js'
 import { GameManager } from '~/game/GameManager'
 import { useInput, type InputState } from '~/composables/useInput'
@@ -124,6 +138,14 @@ const availablePowerUps = ref<any[]>([])
 const selectedPowerUpIds = ref<Set<string>>(new Set())
 const debugStartWave = ref(1)
 const currentWave = ref(0)
+
+const mainPowerUpOptions = computed(() => {
+  return powerUpOptions.value.filter(opt => opt.id !== 'skip')
+})
+
+const skipPowerUpOption = computed(() => {
+  return powerUpOptions.value.find(opt => opt.id === 'skip')
+})
 
 // --- Input ---
 const input = useInput()
@@ -267,13 +289,29 @@ const handlePowerUpKey = (e: KeyboardEvent) => {
   if (!showPowerUp.value) return
 
   const key = e.key.toLowerCase()
+  const totalOptions = powerUpOptions.value.length
+  const mainOptionsCount = mainPowerUpOptions.value.length
+
   if (key === 'z' || key === 'x' || key === 'enter') {
     // Z, X, または Enterで決定
     selectPowerUp(selectedIndex.value)
   } else if (e.key === 'ArrowLeft' || e.key === 'Left') {
-    selectedIndex.value = (selectedIndex.value - 1 + powerUpOptions.value.length) % powerUpOptions.value.length
+    if (selectedIndex.value < mainOptionsCount) {
+       selectedIndex.value = (selectedIndex.value - 1 + mainOptionsCount) % mainOptionsCount
+    }
   } else if (e.key === 'ArrowRight' || e.key === 'Right') {
-    selectedIndex.value = (selectedIndex.value + 1) % powerUpOptions.value.length
+    if (selectedIndex.value < mainOptionsCount) {
+       selectedIndex.value = (selectedIndex.value + 1) % mainOptionsCount
+    }
+  } else if (e.key === 'ArrowDown' || e.key === 'Down') {
+    if (selectedIndex.value < mainOptionsCount && skipPowerUpOption.value) {
+      selectedIndex.value = totalOptions - 1 // Skipボタンへ
+    }
+  } else if (e.key === 'ArrowUp' || e.key === 'Up') {
+    if (selectedIndex.value === totalOptions - 1) {
+       // 中央の強化項目に戻す
+       selectedIndex.value = Math.floor(mainOptionsCount / 2) 
+    }
   }
 }
 
@@ -516,6 +554,14 @@ onUnmounted(() => {
   100% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
 }
 
+.rarity-stars {
+  color: #ffd700;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+
 .powerup-card h3 {
   color: #00ffcc;
   font-size: 1.4rem;
@@ -526,6 +572,32 @@ onUnmounted(() => {
   color: #eee !important;
   font-size: 0.95rem !important;
   line-height: 1.4;
+}
+
+.powerup-skip-container {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.powerup-skip-button {
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: #aaa;
+  font-size: 1.1rem;
+  padding: 0.5rem 2rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.powerup-skip-button:hover, .powerup-skip-button.selected {
+  border-color: #fff;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
 }
 
 /* ポーズUI */
