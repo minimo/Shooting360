@@ -209,20 +209,11 @@ export class GameManager {
             }
         })
 
-        this.scoreText = new Text({ text: 'SCORE: 000000', style })
+        this.scoreText = new Text({ text: 'WAVE 0  SCORE: 000000', style })
         this.scoreText.anchor.set(0, 0.5) // 縦の中央を基準にする
         this.scoreText.x = 20
         this.scoreText.y = 30 // HPゲージ (y=20, h=20) の中心 y=30 に合わせる
         this.uiContainer.addChild(this.scoreText)
-
-        // --- Wave Text ---
-        const waveStyle = style.clone()
-        waveStyle.align = 'right'
-        this.waveText = new Text({ text: 'WAVE 1', style: waveStyle })
-        this.waveText.anchor.set(1, 0.5)
-        this.waveText.x = this.screenWidth - 20
-        this.waveText.y = 30 // スコア・HPゲージと同じ高さ
-        this.uiContainer.addChild(this.waveText)
 
         // --- Announcement Text (Center) ---
         const annStyle = style.clone()
@@ -247,7 +238,7 @@ export class GameManager {
         const isBossWave = this.currentWave % 5 === 0
         const text = isBossWave ? `WAVE ${this.currentWave} BOSS START` : `WAVE ${this.currentWave} START`
         this.showAnnouncement(text, 240) // 4秒表示
-        if (this.waveText) this.waveText.text = `WAVE ${this.currentWave}${isBossWave ? ' (BOSS)' : ''}`
+        this.addScore(0) // HUD更新をトリガー
     }
 
     private clearWave(): void {
@@ -339,7 +330,7 @@ export class GameManager {
     private addScore(amount: number): void {
         this.score += amount
         if (this.scoreText) {
-            this.scoreText.text = `SCORE: ${this.score.toString().padStart(6, '0')}`
+            this.scoreText.text = `WAVE ${this.currentWave}  SCORE: ${this.score.toString().padStart(6, '0')}`
         }
     }
 
@@ -627,10 +618,6 @@ export class GameManager {
         if (this.scoreText) {
             this.scoreText.x = 20
             this.scoreText.y = 30
-        }
-        if (this.waveText) {
-            this.waveText.x = width - 20
-            this.waveText.y = 30
         }
         if (this.announcementText) {
             this.announcementText.x = width / 2
