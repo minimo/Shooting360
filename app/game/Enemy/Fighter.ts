@@ -28,7 +28,7 @@ export class Fighter extends GameObject {
     public hp: number = 3
 
     /** 自機への参照 */
-    private player: Player
+    protected player: Player
 
     /** 弾生成コールバック */
     private spawnBullet: SpawnBulletFn

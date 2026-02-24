@@ -2,6 +2,7 @@ import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js'
 import { Player } from './Player'
 import { Bullet } from './Bullet'
 import { Fighter } from './Enemy/Fighter'
+import { AceFighter } from './Enemy/AceFighter'
 import { MissileFlower } from './Enemy/MissileFlower'
 import { Explosion } from './Explosion'
 import { Particle } from './Particle'
@@ -552,7 +553,7 @@ export class GameManager {
 
         // 3. 全オブジェクト更新 & 当たり判定 (ゲーム中、またはゲームオーバー演出中)
         if (this.isGameActive || this.gameOverTimer > 0) {
-            this.checkCollisions()
+            this.checkCollisions(delta)
 
             for (const obj of this.objects) {
                 if (obj.isAlive) {
@@ -666,10 +667,10 @@ export class GameManager {
 
         this.waveEnemiesSpawned++
 
-        // Wave数に応じてMissileFlowerの出現率を調整
-        // Wave 1: 0%, Wave 2: 10%, Wave 3: 25%, Wave 4: 40%, Wave 5: 60%...
+        // AceFighter の出現率 (Wave 4以降)
+        const aceRate = this.currentWave >= 4 ? Math.min(0.4, (this.currentWave - 3) * 0.1) : 0
+        // MissileFlower (Sniper) の出現率
         const sniperRate = Math.min(0.8, (this.currentWave - 1) * 0.15)
-        const isSniper = Math.random() < sniperRate
 
         // 画面外のランダムな位置にスポーン
         const angle = Math.random() * Math.PI * 2
@@ -678,7 +679,15 @@ export class GameManager {
         const x = this.player.position.x + Math.sin(angle) * dist
         const y = this.player.position.y - Math.cos(angle) * dist
 
-        if (isSniper) {
+        const rand = Math.random()
+
+        if (rand < aceRate) {
+            const enemy = new AceFighter(x, y, this.player,
+                (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'),
+                (obj) => this.addObject(obj)
+            )
+            this.addObject(enemy)
+        } else if (rand < aceRate + sniperRate) {
             const sniper = new MissileFlower(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnHomingMissile(ex, ey, ea))
             this.addObject(sniper)
         } else {
@@ -690,26 +699,45 @@ export class GameManager {
     /**
      * 当たり判定管理
      */
-    private checkCollisions(): void {
+    private checkCollisions(delta: number): void {
         // 弾丸などの生存しているオブジェクトを取得
         const bullets = this.objects.filter(obj => obj instanceof Bullet && obj.isAlive) as Bullet[]
         const enemies = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) as (Fighter | MissileFlower)[]
+        const lasers = this.objects.filter(obj => obj instanceof Laser && obj.isAlive) as Laser[]
 
-        // レーザーの当たり判定（発射中のみ判定）
-        if (this.laser.state === LaserState.FIRING) {
+        // レーザーの当たり判定
+        for (const laser of lasers) {
+            const isPlayerLaser = laser === this.laser
 
-            const start = this.player.position
-            const end = this.laser.getEndPoint()
-            for (const enemy of enemies) {
-                if (this.lineCircleTest(start.x, start.y, end.x, end.y, enemy.position.x, enemy.position.y, enemy.radius)) {
-                    enemy.takeDamage(10 * this.player.laserDamageMultiplier) // 倍率適用
-                    this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffffff, enemy.velocity.x, enemy.velocity.y)
-                    if (!enemy.isAlive) {
-                        this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
-                        if (enemy instanceof MissileFlower) {
-                            this.addScore(1000)
-                        } else {
-                            this.addScore(300)
+            if (laser.state === LaserState.FIRING) {
+                const start = laser.position
+                const end = laser.getEndPoint()
+
+                if (isPlayerLaser) {
+                    // 自機のレーザー vs 敵機
+                    for (const enemy of enemies) {
+                        if (this.lineCircleTest(start.x, start.y, end.x, end.y, enemy.position.x, enemy.position.y, enemy.radius)) {
+                            enemy.takeDamage(10 * this.player.laserDamageMultiplier) // 倍率適用
+                            this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffffff, enemy.velocity.x, enemy.velocity.y)
+                            if (!enemy.isAlive) {
+                                this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                                if (enemy instanceof AceFighter) {
+                                    this.addScore(2000)
+                                } else if (enemy instanceof MissileFlower) {
+                                    this.addScore(1000)
+                                } else {
+                                    this.addScore(300)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // 敵のレーザー vs 自機
+                    if (this.lineCircleTest(start.x, start.y, end.x, end.y, this.player.position.x, this.player.position.y, this.player.radius)) {
+                        this.player.takeDamage(0.2 * delta)
+                        this.shakeFrames = Math.max(this.shakeFrames, 5)
+                        if (Math.random() < 0.3) {
+                            this.spawnHitEffect(this.player.position.x, this.player.position.y, 0xffff00, this.player.velocity.x, this.player.velocity.y)
                         }
                     }
                 }
