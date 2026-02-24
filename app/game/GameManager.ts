@@ -6,7 +6,6 @@ import { AceFighter } from './Enemy/AceFighter'
 import { MissileFlower } from './Enemy/MissileFlower'
 import { Explosion } from './Explosion'
 import { Particle } from './Particle'
-import { Laser, LaserState } from './Laser'
 import { Minimap } from './Minimap'
 import { BackgroundObject } from './BackgroundObject'
 import { HomingMissile } from './HomingMissile'
@@ -14,6 +13,7 @@ import { HomingExplosion } from './HomingExplosion'
 import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
 import type { InputState } from '~/composables/useInput'
 import { Gauge } from './Gauge'
+import { Laser, LaserState } from './Laser'
 
 export interface PowerUp {
     id: string
@@ -731,39 +731,22 @@ export class GameManager {
         const enemies = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) as (Fighter | MissileFlower)[]
         const lasers = this.objects.filter(obj => obj instanceof Laser && obj.isAlive) as Laser[]
 
-        // レーザーの当たり判定
-        for (const laser of lasers) {
-            const isPlayerLaser = laser === this.laser
-
-            if (laser.state === LaserState.FIRING) {
-                const start = laser.position
-                const end = laser.getEndPoint()
-
-                if (isPlayerLaser) {
-                    // 自機のレーザー vs 敵機
-                    for (const enemy of enemies) {
-                        if (this.lineCircleTest(start.x, start.y, end.x, end.y, enemy.position.x, enemy.position.y, enemy.radius)) {
-                            enemy.takeDamage(10 * this.player.laserDamageMultiplier) // 倍率適用
-                            this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffffff, enemy.velocity.x, enemy.velocity.y)
-                            if (!enemy.isAlive) {
-                                this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
-                                if (enemy instanceof AceFighter) {
-                                    this.addScore(2000)
-                                } else if (enemy instanceof MissileFlower) {
-                                    this.addScore(1000)
-                                } else {
-                                    this.addScore(300)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // 敵のレーザー vs 自機
-                    if (this.lineCircleTest(start.x, start.y, end.x, end.y, this.player.position.x, this.player.position.y, this.player.radius)) {
-                        this.player.takeDamage(0.2 * delta)
-                        this.shakeFrames = Math.max(this.shakeFrames, 5)
-                        if (Math.random() < 0.3) {
-                            this.spawnHitEffect(this.player.position.x, this.player.position.y, 0xffff00, this.player.velocity.x, this.player.velocity.y)
+        // レーザーの当たり判定（発射中のみ判定）
+        if (this.laser.state === LaserState.FIRING) {
+            const start = this.player.position
+            const end = this.laser.getEndPoint()
+            for (const enemy of enemies) {
+                if (this.lineCircleTest(start.x, start.y, end.x, end.y, enemy.position.x, enemy.position.y, enemy.radius)) {
+                    enemy.takeDamage(10 * this.player.laserDamageMultiplier) // 倍率適用
+                    this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffffff, enemy.velocity.x, enemy.velocity.y)
+                    if (!enemy.isAlive) {
+                        this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                        if (enemy instanceof AceFighter) {
+                            this.addScore(2000)
+                        } else if (enemy instanceof MissileFlower) {
+                            this.addScore(1000)
+                        } else {
+                            this.addScore(300)
                         }
                     }
                 }
@@ -785,8 +768,9 @@ export class GameManager {
 
                         if (!enemy.isAlive) {
                             this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
-                            // 撃破加点
-                            if (enemy instanceof MissileFlower) {
+                            if (enemy instanceof AceFighter) {
+                                this.addScore(2000)
+                            } else if (enemy instanceof MissileFlower) {
                                 this.addScore(1000)
                             } else {
                                 this.addScore(300)

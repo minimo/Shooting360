@@ -16,7 +16,7 @@ export class Fighter extends GameObject {
 
     /** 射撃間隔 */
     public fireInterval: number = 60
-    private fireCooldown: number = 0
+    protected fireCooldown: number = 0
 
     /** 自機を掠める際のオフセット方向 (1 or -1) */
     private offsetSign: number = Math.random() < 0.5 ? 1 : -1
@@ -143,7 +143,7 @@ export class Fighter extends GameObject {
     /**
      * 自機に向けて弾を発射
      */
-    private shoot(): void {
+    protected shoot(): void {
         // 現在の向きに弾を発射（敵弾であることを指定）
         this.spawnBullet(this.position.x, this.position.y, this.rotation, 'enemy')
     }
