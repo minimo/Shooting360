@@ -303,38 +303,34 @@ export class GameManager {
 
     private updateWaveAnnouncement(delta: number): void {
         if (!this.announcementText) return
+
         if (this.waveTransitionTimer > 0) {
             this.waveTransitionTimer -= delta
             // 後半1秒でフェードアウト
             if (this.waveTransitionTimer < 60) {
-                // 最大 0.5 から 0 へ
-                this.announcementText.alpha = (this.waveTransitionTimer / 60) * 0.5
+                this.announcementText.alpha = (this.waveTransitionTimer / 60) * 0.7
             } else {
-                this.announcementText.alpha = 0.5
+                this.announcementText.alpha = 0.7
             }
-        } else {
+        } else if (this.announcementText.text !== '' || this.isWaitingForClearAnnouncement || this.isWaveClearing || this.isSpawningDelayed || this.isWaitingForNextWave) {
+            // タイマー終了時の1回限りの遷移処理
             const previousText = this.announcementText.text
             this.announcementText.alpha = 0
-            this.announcementText.text = '' // 終了したらテキストクリア
+            this.announcementText.text = ''
 
             if (this.isWaitingForClearAnnouncement) {
-                // 全滅後の3秒待機が終了 -> CLEAR表示へ
                 this.isWaitingForClearAnnouncement = false
                 this.clearWave()
             } else if (this.isWaveClearing) {
-                // CLEAR表示終了 -> パワーアップ選択へ
                 this.isWaveClearing = false
                 this.generatePowerUpOptions()
             } else if (previousText.includes('START')) {
-                // START表示終了 -> 敵出現前の3秒待機へ
                 this.isSpawningDelayed = true
-                this.showAnnouncement('', 180) // 何も表示せず3秒待機
+                this.showAnnouncement('', 180) // 敵出現前の3秒待機
             } else if (previousText === '') {
                 if (this.isSpawningDelayed) {
-                    // 3秒待機が終わったらスポーン許可
                     this.isSpawningDelayed = false
                 } else if (this.isWaitingForNextWave) {
-                    // 1秒待機が終わったら次のWave開始
                     this.isWaitingForNextWave = false
                     this.nextWave()
                 }
@@ -445,7 +441,8 @@ export class GameManager {
         if (!this.isGameActive) return // タイトル画面中は停止
 
         // ゲーム開始時にコンテナを表示
-        if (!this.mainContainer.visible) {
+        // 初回表示設定
+        if (this.isGameActive && !this.mainContainer.visible) {
             this.mainContainer.visible = true
             this.uiContainer.visible = true
         }
