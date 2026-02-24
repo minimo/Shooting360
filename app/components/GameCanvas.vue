@@ -44,7 +44,12 @@
             <div v-if="option.rarity && option.rarity > 0" class="rarity-stars">
               {{ '★'.repeat(option.rarity) }}
             </div>
-            <h3>{{ option.name }}</h3>
+            <h3>
+              {{ option.name }}
+              <span v-if="option.maxLevel && option.maxLevel > 1" class="level-badge">
+                Lv {{ option.currentLevel }}/{{ option.maxLevel }}
+              </span>
+            </h3>
             <p>{{ option.description }}</p>
           </div>
         </div>
@@ -566,6 +571,20 @@ onUnmounted(() => {
   color: #00ffcc;
   font-size: 1.4rem;
   margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.level-badge {
+  font-size: 0.9rem;
+  background: rgba(0, 255, 204, 0.2);
+  color: #00ffcc;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  font-weight: bold;
 }
 
 .powerup-card p {
