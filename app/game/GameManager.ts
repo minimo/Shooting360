@@ -75,6 +75,13 @@ export class GameManager {
     }
 
     /**
+     * 利用可能な強化項目を取得
+     */
+    public get powerUps(): PowerUp[] {
+        return this.availablePowerUps
+    }
+
+    /**
      * 初期化
      */
     public init(app: Application): void {
@@ -153,6 +160,25 @@ export class GameManager {
 
         this.updateMinimapPosition()
         this.initPowerUps()
+    }
+
+    /**
+     * デバッグモードで開始
+     */
+    public startWithDebug(selectedPowerUpIds: string[], startWave: number): void {
+        this.currentWave = startWave - 1;
+
+        // 強化項目の適用
+        for (const id of selectedPowerUpIds) {
+            const powerUp = this.availablePowerUps.find(p => p.id === id);
+            if (powerUp) {
+                powerUp.effect(this);
+            }
+        }
+
+        this.addScore(0); // UI（WAVE表示）の更新
+        this.nextWave();   // ウェーブ開始をトリガー
+        this.isGameActive = true;
     }
 
     private initPowerUps(): void {

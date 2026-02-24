@@ -55,6 +55,52 @@
         <p>ESC キーで再開</p>
       </div>
     </div>
+
+    <!-- デバッグメニュー -->
+    <div v-if="showDebugMenu" class="overlay debug-overlay">
+      <div class="overlay-content debug-content">
+        <h2 class="debug-title">DEBUG MODE</h2>
+        
+        <div class="debug-section">
+          <h3>強化項目選択</h3>
+          <div class="debug-powerup-grid">
+            <div 
+              v-for="(option, index) in availablePowerUps" 
+              :key="option.id" 
+              class="debug-powerup-card"
+              :class="{ 
+                selected: selectedPowerUpIds.has(option.id),
+                highlighted: debugSelectedIndex === index
+              }"
+              @click="toggleDebugPowerUp(option.id)"
+              @mouseenter="debugSelectedIndex = index"
+            >
+              <h4>{{ option.name }}</h4>
+            </div>
+          </div>
+        </div>
+
+        <div class="debug-section">
+          <h3>開始WAVE選択: {{ debugStartWave }}</h3>
+          <div class="debug-wave-selector">
+            <button @click="debugStartWave = Math.max(1, debugStartWave - 1)">-</button>
+            <input type="range" v-model.number="debugStartWave" min="1" max="50">
+            <button @click="debugStartWave = Math.min(50, debugStartWave + 1)">+</button>
+          </div>
+        </div>
+
+        <div class="debug-actions">
+          <button 
+            class="debug-start-button"
+            :class="{ highlighted: debugSelectedIndex === availablePowerUps.length }"
+            @click="startDebugGame"
+            @mouseenter="debugSelectedIndex = availablePowerUps.length"
+          >
+            START GAME
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -69,9 +115,14 @@ const gameContainer = ref<HTMLDivElement | null>(null)
 const showOverlay = ref(true)
 const showGameOver = ref(false)
 const showPowerUp = ref(false)
+const showDebugMenu = ref(false)
 const isPaused = ref(false)
 const selectedIndex = ref(0)
+const debugSelectedIndex = ref(0)
 const powerUpOptions = ref<any[]>([])
+const availablePowerUps = ref<any[]>([])
+const selectedPowerUpIds = ref<Set<string>>(new Set())
+const debugStartWave = ref(1)
 const currentWave = ref(0)
 
 // --- Input ---
@@ -113,10 +164,20 @@ const gameLoop = (time: Ticker) => {
 
 // キー入力でスタートするハンドラ（Z or X キーのみ）
 const startOnKey = (e: KeyboardEvent) => {
-  if (showOverlay.value && gameManager.value && (e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X')) {
-    showOverlay.value = false
-    gameManager.value.isGameActive = true
-    window.removeEventListener('keydown', startOnKey)
+  if (showOverlay.value && gameManager.value) {
+    const key = e.key.toLowerCase()
+    if (key === 'z' || key === 'x') {
+      showOverlay.value = false
+      gameManager.value.isGameActive = true
+      window.removeEventListener('keydown', startOnKey)
+    } else if (key === 'q') {
+      // デバッグモード起動
+      showOverlay.value = false
+      showDebugMenu.value = true
+      availablePowerUps.value = gameManager.value.powerUps
+      window.removeEventListener('keydown', startOnKey)
+      window.addEventListener('keydown', handleDebugKey)
+    }
   }
 }
 
@@ -139,6 +200,65 @@ const selectPowerUp = (index: number) => {
   if (gameManager.value) {
     gameManager.value.selectPowerUp(index)
     showPowerUp.value = false
+  }
+}
+
+const toggleDebugPowerUp = (id: string) => {
+  if (selectedPowerUpIds.value.has(id)) {
+    selectedPowerUpIds.value.delete(id)
+  } else {
+    selectedPowerUpIds.value.add(id)
+  }
+}
+
+const startDebugGame = () => {
+  if (gameManager.value) {
+    gameManager.value.startWithDebug(Array.from(selectedPowerUpIds.value), debugStartWave.value)
+    showDebugMenu.value = false
+    window.removeEventListener('keydown', handleDebugKey)
+  }
+}
+
+// デバッグメニュー用のキーボード操作
+const handleDebugKey = (e: KeyboardEvent) => {
+  if (!showDebugMenu.value) return
+
+  const powerUpCount = availablePowerUps.value.length
+  const totalItems = powerUpCount + 1 // 強化項目 + スタートボタン
+
+  if (e.key === 'ArrowLeft' || e.key === 'Left') {
+    if (debugSelectedIndex.value < powerUpCount) {
+      debugSelectedIndex.value = (debugSelectedIndex.value - 1 + powerUpCount) % powerUpCount
+    }
+  } else if (e.key === 'ArrowRight' || e.key === 'Right') {
+    if (debugSelectedIndex.value < powerUpCount) {
+      debugSelectedIndex.value = (debugSelectedIndex.value + 1) % powerUpCount
+    }
+  } else if (e.key === 'ArrowUp' || e.key === 'Up') {
+    if (debugSelectedIndex.value === powerUpCount) {
+      debugSelectedIndex.value = 0 // スタートボタンからグリッドへ
+    } else if (debugSelectedIndex.value >= 3) {
+      debugSelectedIndex.value -= 3 // 上の行へ (3列想定)
+    }
+  } else if (e.key === 'ArrowDown' || e.key === 'Down') {
+    if (debugSelectedIndex.value < powerUpCount) {
+      if (debugSelectedIndex.value + 3 < powerUpCount) {
+        debugSelectedIndex.value += 3 // 下の行へ
+      } else {
+        debugSelectedIndex.value = powerUpCount // スタートボタンへ
+      }
+    }
+  } else if (e.key === 'z' || e.key === 'z' || e.key === 'Enter') {
+    if (debugSelectedIndex.value < powerUpCount) {
+      toggleDebugPowerUp(availablePowerUps.value[debugSelectedIndex.value].id)
+    } else {
+      startDebugGame()
+    }
+  } else if (e.key === 'w') {
+    // Wave調整 (W/S キー等でも可能にする)
+    debugStartWave.value = Math.min(50, debugStartWave.value + 1)
+  } else if (e.key === 's') {
+    debugStartWave.value = Math.max(1, debugStartWave.value - 1)
   }
 }
 
@@ -419,5 +539,129 @@ onUnmounted(() => {
   letter-spacing: 0.5rem;
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.2) !important;
   margin-bottom: 1rem !important;
+}
+
+/* デバッグメニューUI */
+.debug-overlay {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.debug-content {
+  width: 800px;
+  background: rgba(20, 20, 30, 0.95);
+  border: 2px solid #ff00ff;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 0 40px rgba(255, 0, 255, 0.3);
+}
+
+.debug-title {
+  color: #ff00ff !important;
+  font-size: 3rem !important;
+  margin-bottom: 2rem !important;
+  text-shadow: 0 0 15px rgba(255, 0, 255, 0.6) !important;
+}
+
+.debug-section {
+  margin-bottom: 2rem;
+  text-align: left;
+}
+
+.debug-section h3 {
+  color: #00ffcc;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  border-left: 4px solid #00ffcc;
+  padding-left: 10px;
+}
+
+.debug-powerup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.debug-powerup-card {
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.debug-powerup-card h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.debug-powerup-card.highlighted {
+  border-color: #ffff00;
+  background: rgba(255, 255, 0, 0.1);
+  transform: scale(1.05);
+}
+
+.debug-powerup-card.selected {
+  background: rgba(0, 255, 204, 0.2);
+  border-color: #00ffcc;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+}
+
+.debug-powerup-card.selected h4 {
+  color: #fff;
+  font-weight: bold;
+}
+
+.debug-wave-selector {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.debug-wave-selector button {
+  width: 40px;
+  height: 40px;
+  background: #333;
+  border: 1px solid #555;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.debug-wave-selector button:hover {
+  background: #444;
+}
+
+.debug-wave-selector input {
+  flex: 1;
+  accent-color: #ff00ff;
+}
+
+.debug-actions {
+  margin-top: 2rem;
+}
+
+.debug-start-button {
+  padding: 1rem 3rem;
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #ff00ff 0%, #aa00ff 100%);
+  border: none;
+  border-radius: 50px;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(255, 0, 255, 0.4);
+}
+
+.debug-start-button:hover, .debug-start-button.highlighted {
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(255, 0, 255, 0.6);
+  filter: brightness(1.2);
 }
 </style>
