@@ -355,14 +355,11 @@ export class GameManager {
             powerUp.effect(this)
 
             // スキップ以外を選んだ場合、蓄積されたレア度ボーナスをリセット
-            if (powerUp.id !== 'skip') {
+            if (powerUp.id && powerUp.id !== 'skip') {
                 this.rarityBonus = 0
 
                 // レベルを増加
-                if (!this.powerUpLevels[powerUp.id]) {
-                    this.powerUpLevels[powerUp.id] = 0
-                }
-                this.powerUpLevels[powerUp.id]++
+                this.powerUpLevels[powerUp.id] = (this.powerUpLevels[powerUp.id] ?? 0) + 1
             }
 
             this.isPowerUpSelecting = false
