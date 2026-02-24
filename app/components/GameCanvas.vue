@@ -170,6 +170,15 @@ const handlePauseKey = (e: KeyboardEvent) => {
   }
 }
 
+// フォーカス喪失（タブ切り替え等）時の自動ポーズ
+const handleBlur = () => {
+  if (showOverlay.value || showGameOver.value || showPowerUp.value) return
+  if (gameManager.value && !gameManager.value.isPaused) {
+    gameManager.value.isPaused = true
+    isPaused.value = true
+  }
+}
+
 watch(showPowerUp, (val) => {
   if (val) {
     selectedIndex.value = 0
@@ -201,6 +210,8 @@ onMounted(async () => {
   window.addEventListener('keydown', startOnKey)
   // ポーズ用の入力待ち
   window.addEventListener('keydown', handlePauseKey)
+  // フォーカス喪失時の自動ポーズ
+  window.addEventListener('blur', handleBlur)
 
   // --- Pixi Application 初期化 (固定解像度 1920×1080) ---
   app = new Application()
@@ -231,6 +242,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', startOnKey)
   window.removeEventListener('keydown', restartOnKey)
   window.removeEventListener('keydown', handlePauseKey)
+  window.removeEventListener('blur', handleBlur)
   window.removeEventListener('resize', fitCanvas)
   if (gameManager.value) {
     gameManager.value.destroy()
