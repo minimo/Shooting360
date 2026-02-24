@@ -45,7 +45,7 @@ export class GameManager {
     private announcementText: Text | null = null
 
     // Wave管理
-    private currentWave: number = 0
+    public currentWave: number = 0
     private waveEnemiesSpawned: number = 0
     private totalEnemiesInWave: number = 0
     private isWaveClearing: boolean = false
@@ -251,9 +251,7 @@ export class GameManager {
     }
 
     private clearWave(): void {
-        if (this.isWaveClearing) return
-        this.isWaveClearing = true
-        this.showAnnouncement(`WAVE ${this.currentWave} CLEAR`, 240) // 4秒表示
+        if (this.isPowerUpSelecting) return
 
         // Waveクリア時の回復 (HP 50%回復, パワー全回復)
         if (this.player.isAlive) {
@@ -261,6 +259,9 @@ export class GameManager {
             this.player.laserPower = this.player.maxLaserPower
             this.player.isLaserOverheated = false // オーバーヒートも強制解除
         }
+
+        // 即座にパワーアップ選択肢を生成（UI側でCLEAR表示と統合する）
+        this.generatePowerUpOptions()
     }
 
     public generatePowerUpOptions(): void {
@@ -321,9 +322,6 @@ export class GameManager {
             if (this.isWaitingForClearAnnouncement) {
                 this.isWaitingForClearAnnouncement = false
                 this.clearWave()
-            } else if (this.isWaveClearing) {
-                this.isWaveClearing = false
-                this.generatePowerUpOptions()
             } else if (previousText.includes('START')) {
                 this.isSpawningDelayed = true
                 this.showAnnouncement('', 180) // 敵出現前の3秒待機
@@ -531,7 +529,7 @@ export class GameManager {
             this.updateWaveAnnouncement(delta)
 
             // スポーン処理
-            if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isSpawningDelayed && !this.isWaitingForNextWave && this.waveTransitionTimer <= 0 && this.waveEnemiesSpawned < this.totalEnemiesInWave) {
+            if (!this.isWaveClearing && !this.isWaitingForClearAnnouncement && !this.isSpawningDelayed && !this.isWaitingForNextWave && !this.isPowerUpSelecting && this.waveTransitionTimer <= 0 && this.waveEnemiesSpawned < this.totalEnemiesInWave) {
                 this.enemySpawnTimer -= delta
                 if (this.enemySpawnTimer <= 0) {
                     const enemyCount = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive).length
@@ -555,48 +553,48 @@ export class GameManager {
                     this.showAnnouncement('', 180)
                 }
             }
-        }
 
-        // 3. 全オブジェクト更新 & 当たり判定
-        this.checkCollisions()
+            // 3. 全オブジェクト更新 & 当たり判定
+            this.checkCollisions()
 
-        for (const obj of this.objects) {
-            if (obj.isAlive) {
-                obj.update(delta)
-            }
-
-            // 誘導ミサイルが爆発フラグを立てていたら爆発を生成
-            // (updateで立った場合も、衝突判定で立った場合もここで拾う)
-            if (obj instanceof HomingMissile && obj.shouldExplode) {
-                if (obj.isMaxDistanceExplosion) {
-                    // 最大飛距離到達時は通常の1/4サイズ
-                    this.spawnHomingExplosion(obj.position.x, obj.position.y, obj.velocity.x, obj.velocity.y, 2.25 / 4, 30 / 4)
-                } else {
-                    this.spawnHomingExplosion(obj.position.x, obj.position.y, obj.velocity.x, obj.velocity.y)
+            for (const obj of this.objects) {
+                if (obj.isAlive) {
+                    obj.update(delta)
                 }
-                obj.shouldExplode = false // 二重発生防止
+
+                // 誘導ミサイルが爆発フラグを立てていたら爆発を生成
+                // (updateで立った場合も、衝突判定で立った場合もここで拾う)
+                if (obj instanceof HomingMissile && obj.shouldExplode) {
+                    if (obj.isMaxDistanceExplosion) {
+                        // 最大飛距離到達時は通常の1/4サイズ
+                        this.spawnHomingExplosion(obj.position.x, obj.position.y, obj.velocity.x, obj.velocity.y, 2.25 / 4, 30 / 4)
+                    } else {
+                        this.spawnHomingExplosion(obj.position.x, obj.position.y, obj.velocity.x, obj.velocity.y)
+                    }
+                    obj.shouldExplode = false // 二重発生防止
+                }
             }
-        }
 
-        // 4. 不要なオブジェクトの削除
-        this.cleanup()
+            // 4. 不要なオブジェクトの削除
+            this.cleanup()
 
-        // 5. 表示更新（カメラ追従：自機を常に中心に）
-        const cameraX = this.player.position.x
-        const cameraY = this.player.position.y
+            // 5. 表示更新（カメラ追従：自機を常に中心に）
+            const cameraX = this.player.position.x
+            const cameraY = this.player.position.y
 
-        for (const obj of this.objects) {
-            obj.updateDisplay(cameraX, cameraY)
-        }
-        this.player.updateDisplay(cameraX, cameraY)
+            for (const obj of this.objects) {
+                obj.updateDisplay(cameraX, cameraY)
+            }
+            this.player.updateDisplay(cameraX, cameraY)
 
-        // 6. ミニマップ更新
-        this.minimap.update(this.player, this.objects)
+            // 6. ミニマップ更新
+            this.minimap.update(this.player, this.objects)
 
-        // 7. HPゲージ更新
-        if (this.hpGauge) {
-            this.hpGauge.setValue(this.player.hp)
-            this.hpGauge.update(delta)
+            // 7. HPゲージ更新
+            if (this.hpGauge) {
+                this.hpGauge.setValue(this.player.hp)
+                this.hpGauge.update(delta)
+            }
         }
     }
 

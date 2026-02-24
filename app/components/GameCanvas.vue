@@ -27,11 +27,11 @@
       </div>
     </div>
 
-    <!-- パワーアップ選択画面 -->
+    <!-- パワーアップ選択画面 (Wave Clearと統合) -->
     <div v-if="showPowerUp" class="overlay powerup-overlay">
       <div class="overlay-content">
-        <h2 class="powerup-title">WAVE CLEAR!</h2>
-        <p>強化項目を一つ選択してください</p>
+        <h2 class="powerup-title">WAVE {{ currentWave }} CLEAR!</h2>
+        <p class="powerup-subtitle">強化項目を選択してください</p>
         <div class="powerup-options">
           <div 
             v-for="(option, index) in powerUpOptions" 
@@ -59,11 +59,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import { Application, Ticker } from 'pixi.js'
 import { GameManager } from '~/game/GameManager'
 import { useInput, type InputState } from '~/composables/useInput'
 
+// --- REFS ---
 const gameContainer = ref<HTMLDivElement | null>(null)
 const showOverlay = ref(true)
 const showGameOver = ref(false)
@@ -71,17 +72,18 @@ const showPowerUp = ref(false)
 const isPaused = ref(false)
 const selectedIndex = ref(0)
 const powerUpOptions = ref<any[]>([])
+const currentWave = ref(0)
 
 // --- Input ---
 const input = useInput()
 
 let app: Application | null = null
-let gameManager: GameManager | null = null
+const gameManager = shallowRef<GameManager | null>(null)
 
 // --- Game Loop ---
 const gameLoop = (time: Ticker) => {
-  if (gameManager) {
-    if (gameManager.isGameOver && !showGameOver.value) {
+  if (gameManager.value) {
+    if (gameManager.value.isGameOver && !showGameOver.value) {
       showGameOver.value = true
       // 入力重複防止のため少し待ってからイベント登録
       setTimeout(() => {
@@ -93,46 +95,49 @@ const gameLoop = (time: Ticker) => {
       ? { up: false, down: false, left: false, right: false, shoot: false, laser: false, boost: false }
       : input.state
 
-    gameManager.update(time.deltaTime, effectiveInput as InputState)
+    gameManager.value.update(time.deltaMS / (1000/60), effectiveInput as InputState)
     
+    // 常にWave数を同期
+    currentWave.value = gameManager.value.currentWave
+
     // パワーアップ状態の同期
-    showPowerUp.value = gameManager.isPowerUpSelecting
+    showPowerUp.value = gameManager.value.isPowerUpSelecting
     if (showPowerUp.value) {
-      powerUpOptions.value = gameManager.currentPowerUpOptions
+      powerUpOptions.value = gameManager.value.currentPowerUpOptions
     }
 
     // ポーズ状態の同期
-    isPaused.value = gameManager.isPaused
+    isPaused.value = gameManager.value.isPaused
   }
 }
 
 // キー入力でスタートするハンドラ（Z or X キーのみ）
 const startOnKey = (e: KeyboardEvent) => {
-  if (showOverlay.value && gameManager && (e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X')) {
+  if (showOverlay.value && gameManager.value && (e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X')) {
     showOverlay.value = false
-    gameManager.isGameActive = true
+    gameManager.value.isGameActive = true
     window.removeEventListener('keydown', startOnKey)
   }
 }
 
 // リスタートハンドラ
 const restartOnKey = () => {
-  if (showGameOver.value && gameManager && app) {
+  if (showGameOver.value && gameManager.value && app) {
     showGameOver.value = false
     window.removeEventListener('keydown', restartOnKey)
     
     // 現在のゲームマネージャーを破棄し、再生成
-    gameManager.destroy()
-    gameManager = new GameManager()
-    gameManager.init(app)
-    gameManager.isGameActive = true
+    gameManager.value.destroy()
+    gameManager.value = new GameManager()
+    gameManager.value.init(app)
+    gameManager.value.isGameActive = true
   }
 }
 
 // パワーアップ選択
 const selectPowerUp = (index: number) => {
-  if (gameManager) {
-    gameManager.selectPowerUp(index)
+  if (gameManager.value) {
+    gameManager.value.selectPowerUp(index)
     showPowerUp.value = false
   }
 }
@@ -161,9 +166,9 @@ const handlePauseKey = (e: KeyboardEvent) => {
   if (showOverlay.value || showGameOver.value || showPowerUp.value) return
   
   if (e.key === 'Escape') {
-    if (gameManager) {
-      gameManager.isPaused = !gameManager.isPaused
-      isPaused.value = gameManager.isPaused
+    if (gameManager.value) {
+      gameManager.value.isPaused = !gameManager.value.isPaused
+      isPaused.value = gameManager.value.isPaused
     }
   }
 }
@@ -213,9 +218,9 @@ onMounted(async () => {
   gameContainer.value.appendChild(app.canvas)
 
   // --- GameManager 初期化 ---
-  gameManager = new GameManager()
-  gameManager.init(app)
-  gameManager.resize(GAME_WIDTH, GAME_HEIGHT)
+  gameManager.value = new GameManager()
+  gameManager.value.init(app)
+  gameManager.value.resize(GAME_WIDTH, GAME_HEIGHT)
 
   // --- メインループ ---
   app.ticker.add(gameLoop)
@@ -230,9 +235,9 @@ onUnmounted(() => {
   window.removeEventListener('keydown', restartOnKey)
   window.removeEventListener('keydown', handlePauseKey)
   window.removeEventListener('resize', fitCanvas)
-  if (gameManager) {
-    gameManager.destroy()
-    gameManager = null
+  if (gameManager.value) {
+    gameManager.value.destroy()
+    gameManager.value = null
   }
   if (app) {
     app.destroy(true, { children: true })
@@ -324,15 +329,23 @@ onUnmounted(() => {
 
 /* パワーアップUI */
 .powerup-overlay {
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4); /* 背景をもっと明るく（透けるように） */
+  backdrop-filter: blur(4px);    /* ぼかしも弱く */
 }
 
 .powerup-title {
-  font-size: 3rem !important;
+  font-size: 4rem !important;    /* CLEAR表示に合わせて大きく */
   color: #ffff00 !important;
-  text-shadow: 0 0 30px rgba(255, 255, 0, 0.5) !important;
+  text-shadow: 0 0 30px rgba(255, 255, 0, 0.5), 0 0 10px rgba(0, 0, 0, 0.5) !important;
+  margin-bottom: 0.5rem !important;
+  letter-spacing: 0.2rem;
+}
+
+.powerup-subtitle {
+  color: #fff !important;
+  font-size: 1.4rem !important;
   margin-bottom: 2rem !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .powerup-options {
