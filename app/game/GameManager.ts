@@ -440,9 +440,13 @@ export class GameManager {
 
         // ゲーム開始時にコンテナを表示
         // 初回表示設定
-        if (this.isGameActive && !this.mainContainer.visible) {
+        if (this.isGameActive && !this.mainContainer.visible && !this.isGameOver) {
             this.mainContainer.visible = true
             this.uiContainer.visible = true
+        } else if (!this.isGameActive && this.gameOverTimer <= 0) {
+            // タイトル画面などで演出が終わっている場合は非表示にする
+            this.mainContainer.visible = false
+            this.uiContainer.visible = false
         }
 
         // --- 画面シェイクエフェクト ---
@@ -553,8 +557,10 @@ export class GameManager {
                     this.showAnnouncement('', 180)
                 }
             }
+        }
 
-            // 3. 全オブジェクト更新 & 当たり判定
+        // 3. 全オブジェクト更新 & 当たり判定 (ゲーム中、またはゲームオーバー演出中)
+        if (this.isGameActive || this.gameOverTimer > 0) {
             this.checkCollisions()
 
             for (const obj of this.objects) {
