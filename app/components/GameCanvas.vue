@@ -147,11 +147,8 @@ const handlePowerUpKey = (e: KeyboardEvent) => {
   if (!showPowerUp.value) return
 
   const key = e.key.toLowerCase()
-  if (key === 'z') {
-    // Zキーで次を選択（ループ）
-    selectedIndex.value = (selectedIndex.value + 1) % powerUpOptions.value.length
-  } else if (key === 'x' || key === 'enter') {
-    // XキーまたはEnterで決定
+  if (key === 'z' || key === 'x' || key === 'enter') {
+    // Z, X, または Enterで決定
     selectPowerUp(selectedIndex.value)
   } else if (e.key === 'ArrowLeft' || e.key === 'Left') {
     selectedIndex.value = (selectedIndex.value - 1 + powerUpOptions.value.length) % powerUpOptions.value.length
