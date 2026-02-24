@@ -172,14 +172,17 @@ export class GameManager {
     /**
      * デバッグモードで開始
      */
-    public startWithDebug(selectedPowerUpIds: string[], startWave: number): void {
+    public startWithDebug(powerUpLevels: Record<string, number>, startWave: number): void {
         this.currentWave = startWave - 1;
 
         // 強化項目の適用
-        for (const id of selectedPowerUpIds) {
+        for (const [id, level] of Object.entries(powerUpLevels)) {
             const powerUp = this.availablePowerUps.find(p => p.id === id);
-            if (powerUp) {
-                powerUp.effect(this);
+            if (powerUp && level > 0) {
+                for (let i = 0; i < level; i++) {
+                    powerUp.effect(this);
+                }
+                this.powerUpLevels[id] = level;
             }
         }
 

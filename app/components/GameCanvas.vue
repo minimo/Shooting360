@@ -46,8 +46,8 @@
             </div>
             <h3>
               {{ option.name }}
-              <span v-if="option.maxLevel && option.maxLevel > 1" class="level-badge">
-                Lv {{ option.currentLevel }}/{{ option.maxLevel }}
+              <span class="level-badge" :style="{ visibility: (option.maxLevel && option.maxLevel > 1) ? 'visible' : 'hidden' }">
+                Lv {{ option.currentLevel || 0 }}/{{ option.maxLevel || 1 }}
               </span>
             </h3>
             <p>{{ option.description }}</p>
@@ -88,13 +88,26 @@
               :key="option.id" 
               class="debug-powerup-card"
               :class="{ 
-                selected: selectedPowerUpIds.has(option.id),
+                selected: (debugPowerUpLevels[option.id] || 0) > 0,
                 highlighted: debugSelectedIndex === index
               }"
-              @click="toggleDebugPowerUp(option.id)"
+              @click="incrementDebugPowerUp(option.id, option.maxLevel || 1)"
+              @contextmenu.prevent="decrementDebugPowerUp(option.id)"
               @mouseenter="debugSelectedIndex = index"
             >
               <h4>{{ option.name }}</h4>
+              <div 
+                class="debug-level-badge"
+                :class="{ active: (debugPowerUpLevels[option.id] || 0) > 0 }"
+                :style="{ visibility: (option.maxLevel && option.maxLevel > 1) || (debugPowerUpLevels[option.id] || 0) > 0 ? 'visible' : 'hidden' }"
+              >
+                <template v-if="option.maxLevel && option.maxLevel > 1">
+                  Lv {{ debugPowerUpLevels[option.id] || 0 }}/{{ option.maxLevel }}
+                </template>
+                <template v-else>
+                  {{ (debugPowerUpLevels[option.id] || 0) > 0 ? 'ON' : 'OFF' }}
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -140,7 +153,7 @@ const selectedIndex = ref(0)
 const debugSelectedIndex = ref(0)
 const powerUpOptions = ref<any[]>([])
 const availablePowerUps = ref<any[]>([])
-const selectedPowerUpIds = ref<Set<string>>(new Set())
+const debugPowerUpLevels = ref<Record<string, number>>({})
 const debugStartWave = ref(1)
 const currentWave = ref(0)
 
@@ -230,17 +243,23 @@ const selectPowerUp = (index: number) => {
   }
 }
 
-const toggleDebugPowerUp = (id: string) => {
-  if (selectedPowerUpIds.value.has(id)) {
-    selectedPowerUpIds.value.delete(id)
-  } else {
-    selectedPowerUpIds.value.add(id)
+const incrementDebugPowerUp = (id: string, maxLevel: number = 1) => {
+  const current = debugPowerUpLevels.value[id] || 0
+  if (current < maxLevel) {
+    debugPowerUpLevels.value[id] = current + 1
+  }
+}
+
+const decrementDebugPowerUp = (id: string) => {
+  const current = debugPowerUpLevels.value[id] || 0
+  if (current > 0) {
+    debugPowerUpLevels.value[id] = current - 1
   }
 }
 
 const startDebugGame = () => {
   if (gameManager.value) {
-    gameManager.value.startWithDebug(Array.from(selectedPowerUpIds.value), debugStartWave.value)
+    gameManager.value.startWithDebug(debugPowerUpLevels.value, debugStartWave.value)
     showDebugMenu.value = false
     window.removeEventListener('keydown', handleDebugKey)
   }
@@ -277,9 +296,14 @@ const handleDebugKey = (e: KeyboardEvent) => {
     }
   } else if (e.key === 'z' || e.key === 'z' || e.key === 'Enter') {
     if (debugSelectedIndex.value < powerUpCount) {
-      toggleDebugPowerUp(availablePowerUps.value[debugSelectedIndex.value].id)
+      const option = availablePowerUps.value[debugSelectedIndex.value]
+      incrementDebugPowerUp(option.id, option.maxLevel || 1)
     } else {
       startDebugGame()
+    }
+  } else if (e.key === 'x') {
+    if (debugSelectedIndex.value < powerUpCount) {
+      decrementDebugPowerUp(availablePowerUps.value[debugSelectedIndex.value].id)
     }
   } else if (e.key === 'w') {
     // Wave調整 (W/S キー等でも可能にする)
@@ -525,31 +549,32 @@ onUnmounted(() => {
   gap: 20px;
   margin-top: 2rem;
   justify-content: center;
+  align-items: stretch; /* 全てのカードの高さを揃える */
 }
 
 .powerup-card {
   width: 280px;
-  padding: 2rem;
+  height: 450px; /* 厳密に固定 */
+  padding: 2.5rem 2rem;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
   border: 2px solid rgba(0, 255, 204, 0.3);
   border-radius: 16px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .powerup-card:hover, .powerup-card.selected {
-  transform: translateY(-10px);
   background: linear-gradient(135deg, rgba(0, 255, 204, 0.2) 0%, rgba(0, 255, 204, 0.1) 100%);
   border-color: #00ffcc;
-  box-shadow: 0 10px 30px rgba(0, 255, 204, 0.3);
+  box-shadow: 0 0 30px rgba(0, 255, 204, 0.4);
 }
 
 .powerup-card.selected {
-  border-width: 3px;
   animation: pulse-border 1.5s infinite;
 }
 
@@ -691,7 +716,6 @@ onUnmounted(() => {
 .debug-powerup-card.highlighted {
   border-color: #ffff00;
   background: rgba(255, 255, 0, 0.1);
-  transform: scale(1.05);
 }
 
 .debug-powerup-card.selected {
@@ -702,7 +726,23 @@ onUnmounted(() => {
 
 .debug-powerup-card.selected h4 {
   color: #fff;
-  font-weight: bold;
+}
+
+.debug-level-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: #aaa;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.debug-level-badge.active {
+  background: rgba(0, 255, 204, 0.2);
+  color: #00ffcc;
+  border: 1px solid rgba(0, 255, 204, 0.5);
 }
 
 .debug-wave-selector {
