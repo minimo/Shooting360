@@ -47,6 +47,7 @@ export class GameManager {
     private scoreText: Text | null = null
     private waveText: Text | null = null
     private announcementText: Text | null = null
+    private powerUpListText: Text | null = null
 
     // Wave管理
     public currentWave: number = 0
@@ -186,6 +187,7 @@ export class GameManager {
             }
         }
 
+        this.updatePowerUpListUI();
         this.addScore(0); // UI（WAVE表示）の更新
         this.nextWave();   // ウェーブ開始をトリガー
         this.isGameActive = true;
@@ -255,6 +257,26 @@ export class GameManager {
         this.scoreText.x = 20
         this.scoreText.y = 30 // HPゲージ (y=20, h=20) の中心 y=30 に合わせる
         this.uiContainer.addChild(this.scoreText)
+
+        // --- パワーアップ一覧テキスト ---
+        const puStyle = new TextStyle({
+            fontFamily: 'Orbitron, sans-serif',
+            fontSize: 16,
+            fill: '#ddeeff',
+            dropShadow: {
+                alpha: 0.6,
+                angle: 2,
+                blur: 3,
+                color: '#000000',
+                distance: 1
+            }
+        })
+        this.powerUpListText = new Text({ text: '', style: puStyle })
+        this.powerUpListText.anchor.set(0, 0)
+        this.powerUpListText.x = 20
+        this.powerUpListText.y = 50
+        this.powerUpListText.alpha = 0.85
+        this.uiContainer.addChild(this.powerUpListText)
 
         // --- Announcement Text (Center) ---
         const annStyle = style.clone()
@@ -366,6 +388,8 @@ export class GameManager {
                 this.powerUpLevels[powerUp.id] = (this.powerUpLevels[powerUp.id] ?? 0) + 1
             }
 
+            this.updatePowerUpListUI()
+
             this.isPowerUpSelecting = false
             this.currentPowerUpOptions = []
 
@@ -421,6 +445,26 @@ export class GameManager {
         if (this.scoreText) {
             this.scoreText.text = `WAVE ${this.currentWave}  SCORE: ${this.score.toString().padStart(6, '0')}`
         }
+    }
+
+    /**
+     * 取得済み強化項目の表示を更新
+     */
+    private updatePowerUpListUI(): void {
+        if (!this.powerUpListText) return
+
+        const entries: string[] = []
+        for (const pu of this.availablePowerUps) {
+            const level = this.powerUpLevels[pu.id] || 0
+            if (level <= 0) continue
+            if (pu.maxLevel && pu.maxLevel > 1) {
+                entries.push(`${pu.name} Lv.${level}`)
+            } else {
+                entries.push(pu.name)
+            }
+        }
+
+        this.powerUpListText.text = entries.join(' / ')
     }
 
     /**
@@ -707,6 +751,10 @@ export class GameManager {
         if (this.scoreText) {
             this.scoreText.x = 20
             this.scoreText.y = 30
+        }
+        if (this.powerUpListText) {
+            this.powerUpListText.x = 20
+            this.powerUpListText.y = 50
         }
         if (this.announcementText) {
             this.announcementText.x = width / 2
