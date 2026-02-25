@@ -80,7 +80,7 @@
       <div class="overlay-content debug-content">
         <h2 class="debug-title">DEBUG MODE</h2>
         
-        <div class="debug-section">
+        <div class="debug-section debug-section-powerups">
           <h3>強化項目選択</h3>
           <div class="debug-powerup-grid">
             <div 
@@ -294,13 +294,13 @@ const handleDebugKey = (e: KeyboardEvent) => {
       debugSelectedIndex.value = waveIndex // スタート → Wave選択
     } else if (debugSelectedIndex.value === waveIndex) {
       debugSelectedIndex.value = 0 // Wave選択 → グリッド先頭
-    } else if (debugSelectedIndex.value >= 3) {
-      debugSelectedIndex.value -= 3 // 上の行へ (3列想定)
+    } else if (debugSelectedIndex.value >= 4) {
+      debugSelectedIndex.value -= 4 // 上の行へ (4列想定)
     }
   } else if (e.key === 'ArrowDown' || e.key === 'Down') {
     if (debugSelectedIndex.value < powerUpCount) {
-      if (debugSelectedIndex.value + 3 < powerUpCount) {
-        debugSelectedIndex.value += 3 // 下の行へ
+      if (debugSelectedIndex.value + 4 < powerUpCount) {
+        debugSelectedIndex.value += 4 // 下の行へ
       } else {
         debugSelectedIndex.value = waveIndex // グリッド → Wave選択
       }
@@ -675,7 +675,11 @@ onUnmounted(() => {
 }
 
 .debug-content {
-  width: 800px;
+  width: 860px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: rgba(20, 20, 30, 0.95);
   border: 2px solid #ff00ff;
   border-radius: 20px;
@@ -686,13 +690,26 @@ onUnmounted(() => {
 .debug-title {
   color: #ff00ff !important;
   font-size: 3rem !important;
-  margin-bottom: 2rem !important;
+  margin-bottom: 1rem !important;
   text-shadow: 0 0 15px rgba(255, 0, 255, 0.6) !important;
+  flex-shrink: 0;
 }
 
 .debug-section {
-  margin-bottom: 2rem;
   text-align: left;
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.debug-section-powerups {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .debug-section h3 {
@@ -705,8 +722,12 @@ onUnmounted(() => {
 
 .debug-powerup-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 4px;
+  flex: 1;
+  min-height: 0;
 }
 
 .debug-powerup-card {
@@ -757,13 +778,7 @@ onUnmounted(() => {
   border: 1px solid rgba(0, 255, 204, 0.5);
 }
 
-.debug-section {
-  margin-bottom: 0.5rem;
-  padding: 1rem;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  box-sizing: border-box;
-}
+
 
 .debug-section.debug-section-highlighted {
   background: rgba(255, 255, 0, 0.08);
@@ -799,7 +814,8 @@ onUnmounted(() => {
 }
 
 .debug-actions {
-  margin-top: 2rem;
+  margin-top: 1rem;
+  flex-shrink: 0;
 }
 
 .debug-start-button {
