@@ -112,21 +112,21 @@
           </div>
         </div>
 
-        <div class="debug-section">
+        <div class="debug-section" :class="{ 'debug-section-highlighted': debugSelectedIndex === availablePowerUps.length }" @mouseenter="debugSelectedIndex = availablePowerUps.length">
           <h3>開始WAVE選択: {{ debugStartWave }}</h3>
           <div class="debug-wave-selector">
-            <button @click="debugStartWave = Math.max(1, debugStartWave - 1)">-</button>
+            <button @click="debugStartWave = Math.max(1, debugStartWave - 1)">◀</button>
             <input type="range" v-model.number="debugStartWave" min="1" max="50">
-            <button @click="debugStartWave = Math.min(50, debugStartWave + 1)">+</button>
+            <button @click="debugStartWave = Math.min(50, debugStartWave + 1)">▶</button>
           </div>
         </div>
 
         <div class="debug-actions">
           <button 
             class="debug-start-button"
-            :class="{ highlighted: debugSelectedIndex === availablePowerUps.length }"
+            :class="{ highlighted: debugSelectedIndex === availablePowerUps.length + 1 }"
             @click="startDebugGame"
-            @mouseenter="debugSelectedIndex = availablePowerUps.length"
+            @mouseenter="debugSelectedIndex = availablePowerUps.length + 1"
           >
             START GAME
           </button>
@@ -270,19 +270,30 @@ const handleDebugKey = (e: KeyboardEvent) => {
   if (!showDebugMenu.value) return
 
   const powerUpCount = availablePowerUps.value.length
-  const totalItems = powerUpCount + 1 // 強化項目 + スタートボタン
+  const waveIndex = powerUpCount       // Wave選択行のインデックス
+  const startIndex = powerUpCount + 1  // スタートボタンのインデックス
 
   if (e.key === 'ArrowLeft' || e.key === 'Left') {
     if (debugSelectedIndex.value < powerUpCount) {
+      // グリッド内で左移動
       debugSelectedIndex.value = (debugSelectedIndex.value - 1 + powerUpCount) % powerUpCount
+    } else if (debugSelectedIndex.value === waveIndex) {
+      // Wave選択行: Waveを減らす
+      debugStartWave.value = Math.max(1, debugStartWave.value - 1)
     }
   } else if (e.key === 'ArrowRight' || e.key === 'Right') {
     if (debugSelectedIndex.value < powerUpCount) {
+      // グリッド内で右移動
       debugSelectedIndex.value = (debugSelectedIndex.value + 1) % powerUpCount
+    } else if (debugSelectedIndex.value === waveIndex) {
+      // Wave選択行: Waveを増やす
+      debugStartWave.value = Math.min(50, debugStartWave.value + 1)
     }
   } else if (e.key === 'ArrowUp' || e.key === 'Up') {
-    if (debugSelectedIndex.value === powerUpCount) {
-      debugSelectedIndex.value = 0 // スタートボタンからグリッドへ
+    if (debugSelectedIndex.value === startIndex) {
+      debugSelectedIndex.value = waveIndex // スタート → Wave選択
+    } else if (debugSelectedIndex.value === waveIndex) {
+      debugSelectedIndex.value = 0 // Wave選択 → グリッド先頭
     } else if (debugSelectedIndex.value >= 3) {
       debugSelectedIndex.value -= 3 // 上の行へ (3列想定)
     }
@@ -291,22 +302,23 @@ const handleDebugKey = (e: KeyboardEvent) => {
       if (debugSelectedIndex.value + 3 < powerUpCount) {
         debugSelectedIndex.value += 3 // 下の行へ
       } else {
-        debugSelectedIndex.value = powerUpCount // スタートボタンへ
+        debugSelectedIndex.value = waveIndex // グリッド → Wave選択
       }
+    } else if (debugSelectedIndex.value === waveIndex) {
+      debugSelectedIndex.value = startIndex // Wave選択 → スタート
     }
-  } else if (e.key === 'z' || e.key === 'z' || e.key === 'Enter') {
+  } else if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter') {
     if (debugSelectedIndex.value < powerUpCount) {
       const option = availablePowerUps.value[debugSelectedIndex.value]
       incrementDebugPowerUp(option.id, option.maxLevel || 1)
-    } else {
+    } else if (debugSelectedIndex.value === startIndex) {
       startDebugGame()
     }
-  } else if (e.key === 'x') {
+  } else if (e.key === 'x' || e.key === 'X') {
     if (debugSelectedIndex.value < powerUpCount) {
       decrementDebugPowerUp(availablePowerUps.value[debugSelectedIndex.value].id)
     }
   } else if (e.key === 'w') {
-    // Wave調整 (W/S キー等でも可能にする)
     debugStartWave.value = Math.min(50, debugStartWave.value + 1)
   } else if (e.key === 's') {
     debugStartWave.value = Math.max(1, debugStartWave.value - 1)
@@ -743,6 +755,19 @@ onUnmounted(() => {
   background: rgba(0, 255, 204, 0.2);
   color: #00ffcc;
   border: 1px solid rgba(0, 255, 204, 0.5);
+}
+
+.debug-section {
+  margin-bottom: 0.5rem;
+  padding: 1rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.debug-section.debug-section-highlighted {
+  background: rgba(255, 255, 0, 0.08);
+  border-color: rgba(255, 255, 0, 0.4);
 }
 
 .debug-wave-selector {
