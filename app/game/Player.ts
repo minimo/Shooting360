@@ -41,6 +41,9 @@ export class Player extends GameObject {
     public bulletDamage: number = 1
     public bulletPiercing: boolean = false
 
+    /** 防御ステータス */
+    public damageReductionMultiplier: number = 1.0
+
     /** 加速度 */
     public acceleration: number = 0.675
 
@@ -93,7 +96,8 @@ export class Player extends GameObject {
      * ダメージを受ける
      */
     public takeDamage(amount: number): void {
-        this.hp -= amount
+        const reduced = Math.max(1, Math.round(amount * this.damageReductionMultiplier))
+        this.hp -= reduced
         if (this.hp <= 0) {
             this.hp = 0
             this.isAlive = false

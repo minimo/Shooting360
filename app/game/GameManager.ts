@@ -59,6 +59,11 @@ export class GameManager {
     private isWaitingForNextWave: boolean = false
     private waveTransitionTimer: number = 0
 
+    /** Waveクリア〜次Wave開始までの遷移中かどうか（この間プレイヤーは無敵） */
+    private get isInWaveTransition(): boolean {
+        return this.isWaitingForClearAnnouncement || this.isWaveClearing || this.isPowerUpSelecting || this.isWaitingForNextWave
+    }
+
     // パワーアップ
     public isPowerUpSelecting: boolean = false
     public currentPowerUpOptions: PowerUp[] = []
@@ -208,6 +213,8 @@ export class GameManager {
             { id: 'bullet_speed', name: '弾速アップ', description: '通常弾の弾速が20%増加します', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.bulletSpeedMultiplier *= 1.2 } },
             { id: 'fire_rate', name: '連射速度アップ', description: 'メイン武器の発射間隔が15%短くなります', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.fireRateMultiplier *= 0.85 } },
             { id: 'piercing', name: '貫通弾', description: '弾丸が敵を貫通し、後方の敵にもダメージを与えます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.player.bulletPiercing = true } },
+            { id: 'damage_reduction', name: 'ダメージ軽減', description: '受けるダメージを10%カットします', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.damageReductionMultiplier *= 0.9 } },
+            { id: 'speed_up', name: '最高速度アップ', description: '自機の最高速度が15%アップします', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.maxSpeed *= 1.15 } },
         ]
     }
 
@@ -894,8 +901,8 @@ export class GameManager {
                     }
                 }
             } else {
-                // 敵機の弾 vs 自機
-                if (this.hitTest(bullet, this.player)) {
+                // 敵機の弾 vs 自機（Wave遷移中は無敵）
+                if (!this.isInWaveTransition && this.hitTest(bullet, this.player)) {
                     bullet.isAlive = false
                     this.player.takeDamage(1)
                     this.shakeFrames = 10
@@ -906,12 +913,14 @@ export class GameManager {
             }
         }
 
-        // 自機 vs 敵機（体当り・弾き飛ばし）
+        // 自機 vs 敵機（体当り・弾き飛ばし）（Wave遷移中は無敵）
         for (const enemy of enemies) {
             if (this.hitTest(this.player, enemy)) {
-                // ダメージ処理
-                this.player.takeDamage(2)
-                this.shakeFrames = 15
+                // ダメージ処理（Wave遷移中はダメージなし）
+                if (!this.isInWaveTransition) {
+                    this.player.takeDamage(2)
+                    this.shakeFrames = 15
+                }
 
                 // 衝突ベクトルを計算 (敵からプレイヤーへの方向)
                 const dx = this.player.position.x - enemy.position.x
@@ -954,6 +963,7 @@ export class GameManager {
             }
         }
 
+
         // --- 誘導ミサイル関連の衝突判定 ---
         const missiles = this.objects.filter(obj => obj instanceof HomingMissile && obj.isAlive) as HomingMissile[]
         const homingExplosions = this.objects.filter(obj => obj instanceof HomingExplosion && obj.isAlive) as HomingExplosion[]
@@ -988,7 +998,7 @@ export class GameManager {
                     this.spawnHitEffect(missile.position.x, missile.position.y, 0xffffff, missile.velocity.x, missile.velocity.y)
                 }
             }
-            // 自機との体当り
+            // 自機との体当り（Wave遷移中でもミサイル自体は爆発させるがダメージなし）
             if (this.hitTest(missile, this.player)) {
                 missile.isAlive = false
                 missile.shouldExplode = true
@@ -997,8 +1007,8 @@ export class GameManager {
 
         // 2. 爆発 vs 各種オブジェクト
         for (const ex of homingExplosions) {
-            // 自機との衝突
-            if (this.hitTest(ex, this.player)) {
+            // 自機との衝突（Wave遷移中は無敵）
+            if (!this.isInWaveTransition && this.hitTest(ex, this.player)) {
                 if (ex.canDealDamage(this.player)) {
                     this.player.takeDamage(ex.damage)
                     this.shakeFrames = 20
