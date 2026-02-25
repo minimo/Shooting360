@@ -48,7 +48,7 @@ export class Player extends GameObject {
     public rotationSpeed: number = 0.075
 
     /** 射撃間隔 (フレーム) */
-    private fireInterval: number = 3
+    private fireInterval: number = 6
     private fireCooldown: number = 0
 
     /** 画面サイズ情報 */
@@ -211,9 +211,14 @@ export class Player extends GameObject {
         const rotation = this.rotation
 
         switch (this.weaponType) {
-            case 'normal':
-                this.spawnBullet(x, y, rotation, 'player')
+            case 'normal': {
+                // 2発並列発射（自機の左右にオフセット）
+                const offsetDist = 8
+                const perpAngle = rotation + Math.PI / 2
+                this.spawnBullet(x + Math.sin(perpAngle) * offsetDist, y - Math.cos(perpAngle) * offsetDist, rotation, 'player')
+                this.spawnBullet(x - Math.sin(perpAngle) * offsetDist, y + Math.cos(perpAngle) * offsetDist, rotation, 'player')
                 break
+            }
             case '3way':
                 for (let i = -1; i <= 1; i++) {
                     this.spawnBullet(x, y, rotation + i * 0.2, 'player')
