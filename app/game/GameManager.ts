@@ -129,7 +129,7 @@ export class GameManager {
 
         // --- 弾生成コールバック ---
         const spawnBullet = (x: number, y: number, angle: number, side?: 'player' | 'enemy') => {
-            this.spawnBullet(x, y, angle, side || 'player')
+            this.spawnBullet(x, y, angle, side || 'player', this.player.bulletSpeedMultiplier, this.player.bulletDamage, this.player.bulletPiercing)
         }
 
         // --- Laser ---
@@ -202,6 +202,10 @@ export class GameManager {
             { id: 'laser_power_max', name: 'パワー上限アップ', description: 'レーザーパワーの最大値が100増加します', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.maxLaserPower += 100; gm.player.laserPower = gm.player.maxLaserPower } },
             { id: 'laser_recovery', name: 'パワー回復量アップ', description: 'レーザーパワーの回復速度が1.2倍になります', rarity: 3, maxLevel: 5, effect: (gm) => { gm.player.laserPowerRecoveryMultiplier *= 1.2 } },
             { id: 'laser_eco', name: 'パワー消費量軽減', description: 'レーザーとブーストのパワー消費が10%軽減されます', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.laserConsumptionMultiplier *= 0.9 } },
+            { id: 'bullet_dmg', name: '通常弾攻撃力アップ', description: '通常弾のダメージが+1增加します', rarity: 1, maxLevel: 10, effect: (gm) => { gm.player.bulletDamage += 1 } },
+            { id: 'bullet_speed', name: '弾速アップ', description: '通常弾の弾速が20%増加します', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.bulletSpeedMultiplier *= 1.2 } },
+            { id: 'fire_rate', name: '連射速度アップ', description: 'メイン武器の発射間隔が15%短くなります', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.fireRateMultiplier *= 0.85 } },
+            { id: 'piercing', name: '貫通弾', description: '弾丸が敵を貫通し、後方の敵にもダメージを与えます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.player.bulletPiercing = true } },
         ]
     }
 
@@ -216,8 +220,8 @@ export class GameManager {
     /**
      * 弾丸生成
      */
-    private spawnBullet(x: number, y: number, angle: number, side: 'player' | 'enemy'): void {
-        const bullet = new Bullet(x, y, angle, side)
+    private spawnBullet(x: number, y: number, angle: number, side: 'player' | 'enemy', speedMultiplier: number = 1, damage: number = 1, isPiercing: boolean = false): void {
+        const bullet = new Bullet(x, y, angle, side, speedMultiplier, damage, isPiercing)
         this.addObject(bullet)
     }
 
@@ -816,8 +820,10 @@ export class GameManager {
                 // 自機の弾 vs 敵機
                 for (const enemy of enemies) {
                     if (this.hitTest(bullet, enemy)) {
-                        bullet.isAlive = false
-                        enemy.takeDamage(1)
+                        if (!bullet.isPiercing) {
+                            bullet.isAlive = false
+                        }
+                        enemy.takeDamage(bullet.damage)
                         // ヒットエフェクト
                         this.spawnHitEffect(bullet.position.x, bullet.position.y, 0xffffff, bullet.velocity.x, bullet.velocity.y)
 
@@ -834,6 +840,9 @@ export class GameManager {
                                 this.addScore(300)
                             }
                         }
+
+                        // 貫通弾でなければ最初の敵に当たった時点でループを抜ける
+                        if (!bullet.isPiercing) break
                     }
                 }
             } else {

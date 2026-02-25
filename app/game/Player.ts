@@ -35,6 +35,12 @@ export class Player extends GameObject {
     public laserPowerRecoveryMultiplier: number = 1.0
     public laserConsumptionMultiplier: number = 1.0
 
+    /** 通常弾ステータス */
+    public bulletSpeedMultiplier: number = 1.0
+    public fireRateMultiplier: number = 1.0
+    public bulletDamage: number = 1
+    public bulletPiercing: boolean = false
+
     /** 加速度 */
     public acceleration: number = 0.675
 
@@ -191,7 +197,7 @@ export class Player extends GameObject {
         this.fireCooldown -= delta
         if (input.shoot && this.fireCooldown <= 0) {
             this.shoot()
-            this.fireCooldown = this.fireInterval
+            this.fireCooldown = this.fireInterval * this.fireRateMultiplier
         }
 
         // updateLaserPower は GameManager 側で呼ばれるため、ここでは不要（二重消費防止）

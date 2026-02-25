@@ -13,19 +13,27 @@ export class Bullet extends GameObject {
     /** 最大飛距離 */
     public maxDistance: number = 2400
 
+    /** ダメージ */
+    public damage: number = 1
+
+    /** 貫通弾かどうか */
+    public isPiercing: boolean = false
+
     /** 発射地点（距離計算用） */
     private origin: { x: number; y: number }
 
-    constructor(x: number, y: number, angle: number, side: 'player' | 'enemy' = 'player') {
+    constructor(x: number, y: number, angle: number, side: 'player' | 'enemy' = 'player', speedMultiplier: number = 1, damage: number = 1, isPiercing: boolean = false) {
         super(x, y)
         this.side = side
         this.radius = 4
         this.rotation = angle
         this.origin = { x, y }
+        this.damage = damage
+        this.isPiercing = isPiercing
 
         // 速度ベクトルを設定
-        this.velocity.x = Math.sin(angle) * this.speed
-        this.velocity.y = -Math.cos(angle) * this.speed
+        this.velocity.x = Math.sin(angle) * this.speed * speedMultiplier
+        this.velocity.y = -Math.cos(angle) * this.speed * speedMultiplier
 
         this.createGraphics()
     }
