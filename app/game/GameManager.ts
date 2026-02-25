@@ -198,12 +198,33 @@ export class GameManager {
         this.isGameActive = true;
     }
 
+    /** 排他的な通常弾強化グループ（最後に選んだ1つだけ有効） */
+    private static readonly EXCLUSIVE_SHOT_IDS = ['3way', '5way', 'wide', 'piercing'] as const
+
+    /**
+     * 排他グループの他のパワーアップをリセットする
+     * @param selectedId 今回選択したパワーアップID
+     */
+    private resetExclusiveShotGroup(selectedId: string): void {
+        for (const id of GameManager.EXCLUSIVE_SHOT_IDS) {
+            if (id !== selectedId) {
+                delete this.powerUpLevels[id]
+            }
+        }
+        // 武器タイプ系を選んだ場合は貫通をリセット、貫通を選んだ場合は武器タイプをリセット
+        if (selectedId === 'piercing') {
+            this.player.weaponType = 'normal'
+        } else {
+            this.player.bulletPiercing = false
+        }
+    }
+
     private initPowerUps(): void {
         this.availablePowerUps = [
             { id: 'hp_up', name: 'HP上限アップ', description: '最大HPが5増加し、全回復します', rarity: 1, maxLevel: 20, effect: (gm) => { gm.player.maxHp += 5; gm.player.hp = gm.player.maxHp } },
-            { id: '3way', name: '3-Way Shot', description: 'メイン武器が3方向に発射されます', rarity: 2, maxLevel: 1, effect: (gm) => { gm.player.weaponType = '3way' } },
-            { id: '5way', name: '5-Way Shot', description: 'メイン武器が5方向に発射されます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.player.weaponType = '5way' } },
-            { id: 'wide', name: 'Wide Shot', description: 'メイン武器が並列に5発発射されます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.player.weaponType = 'wide' } },
+            { id: '3way', name: '3-Way Shot', description: 'メイン武器が3方向に発射されます', rarity: 2, maxLevel: 1, effect: (gm) => { gm.resetExclusiveShotGroup('3way'); gm.player.weaponType = '3way' } },
+            { id: '5way', name: '5-Way Shot', description: 'メイン武器が5方向に発射されます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.resetExclusiveShotGroup('5way'); gm.player.weaponType = '5way' } },
+            { id: 'wide', name: 'Wide Shot', description: 'メイン武器が並列に5発発射されます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.resetExclusiveShotGroup('wide'); gm.player.weaponType = 'wide' } },
             { id: 'laser_dmg', name: 'レーザー威力アップ', description: 'レーザーのダメージが1.2倍になります', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.laserDamageMultiplier *= 1.2 } },
             { id: 'laser_width', name: 'レーザー太さアップ', description: 'レーザーが太くなり、当たり判定が広がります', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.laserWidthMultiplier *= 1.4 } },
             { id: 'laser_power_max', name: 'パワー上限アップ', description: 'レーザーパワーの最大値が100増加します', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.maxLaserPower += 100; gm.player.laserPower = gm.player.maxLaserPower } },
@@ -212,7 +233,7 @@ export class GameManager {
             { id: 'bullet_dmg', name: '通常弾攻撃力アップ', description: '通常弾のダメージが+1增加します', rarity: 1, maxLevel: 10, effect: (gm) => { gm.player.bulletDamage += 1 } },
             { id: 'bullet_speed', name: '弾速アップ', description: '通常弾の弾速が20%増加します', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.bulletSpeedMultiplier *= 1.2 } },
             { id: 'fire_rate', name: '連射速度アップ', description: 'メイン武器の発射間隔が15%短くなります', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.fireRateMultiplier *= 0.85 } },
-            { id: 'piercing', name: '貫通弾', description: '弾丸が敵を貫通し、後方の敵にもダメージを与えます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.player.bulletPiercing = true } },
+            { id: 'piercing', name: '貫通弾', description: '弾丸が敵を貫通し、後方の敵にもダメージを与えます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.resetExclusiveShotGroup('piercing'); gm.player.bulletPiercing = true } },
             { id: 'damage_reduction', name: 'ダメージ軽減', description: '受けるダメージを10%カットします', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.damageReductionMultiplier *= 0.9 } },
             { id: 'speed_up', name: '最高速度アップ', description: '自機の最高速度が15%アップします', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.maxSpeed *= 1.15 } },
         ]

@@ -243,9 +243,20 @@ const selectPowerUp = (index: number) => {
   }
 }
 
+/** 排他的な通常弾強化グループ */
+const EXCLUSIVE_SHOT_IDS = ['3way', '5way', 'wide', 'piercing'] as const
+
 const incrementDebugPowerUp = (id: string, maxLevel: number = 1) => {
   const current = debugPowerUpLevels.value[id] || 0
   if (current < maxLevel) {
+    // 排他グループの場合、他をリセット
+    if ((EXCLUSIVE_SHOT_IDS as readonly string[]).includes(id)) {
+      for (const otherId of EXCLUSIVE_SHOT_IDS) {
+        if (otherId !== id) {
+          delete debugPowerUpLevels.value[otherId]
+        }
+      }
+    }
     debugPowerUpLevels.value[id] = current + 1
   }
 }
