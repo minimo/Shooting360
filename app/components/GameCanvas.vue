@@ -27,10 +27,12 @@
       </div>
     </div>
 
-    <!-- パワーアップ選択画面 (Wave Clearと統合) -->
     <div v-if="showPowerUp" class="overlay powerup-overlay">
       <div class="overlay-content">
-        <h2 class="powerup-title">WAVE {{ currentWave }} CLEAR!</h2>
+        <h2 class="powerup-title">
+          <template v-if="gameManager?.powerUpReason === 'level'">LEVEL UP!</template>
+          <template v-else>WAVE {{ currentWave }} CLEAR!</template>
+        </h2>
         <p class="powerup-subtitle">強化項目を選択してください</p>
         <div class="powerup-options">
           <div 
@@ -68,7 +70,7 @@
     </div>
 
     <!-- ポーズ画面 -->
-    <div v-if="isPaused" class="overlay pause-overlay">
+    <div v-if="isPaused && !showPowerUp" class="overlay pause-overlay">
       <div class="overlay-content">
         <h2 class="pause-title">PAUSE</h2>
         <p>ESC キーで再開</p>
@@ -339,6 +341,10 @@ const handleDebugKey = (e: KeyboardEvent) => {
 // パワーアップ選択用のキーボード操作
 const handlePowerUpKey = (e: KeyboardEvent) => {
   if (!showPowerUp.value) return
+  if (e.repeat) return // 長押しによる連続入力を無効化
+  
+  // 表示時にキーが押されていた場合は、一度全て離すまで入力を無視
+  if (isKeyHeldOnPowerUpShow.value) return
 
   const key = e.key.toLowerCase()
   const totalOptions = powerUpOptions.value.length
@@ -389,12 +395,37 @@ const handleBlur = () => {
   }
 }
 
+const isKeyHeldOnPowerUpShow = ref(false)
+
+// キーが離された時の判定
+const handlePowerUpKeyUp = () => {
+  if (!showPowerUp.value) return
+  
+  // すべてのキーが離されたかチェック
+  const s = input.state
+  if (!s.up && !s.down && !s.left && !s.right && !s.shoot && !s.laser && !s.boost) {
+    isKeyHeldOnPowerUpShow.value = false
+  }
+}
+
 watch(showPowerUp, (val) => {
   if (val) {
     selectedIndex.value = 0
+    // 画面が出た瞬間に「ガード状態」にする
+    // 何かキーが押されていたら確実にブロック
+    const s = input.state
+    if (s.up || s.down || s.left || s.right || s.shoot || s.laser || s.boost) {
+      isKeyHeldOnPowerUpShow.value = true
+    } else {
+      isKeyHeldOnPowerUpShow.value = false
+    }
+
     window.addEventListener('keydown', handlePowerUpKey)
+    window.addEventListener('keyup', handlePowerUpKeyUp)
   } else {
     window.removeEventListener('keydown', handlePowerUpKey)
+    window.removeEventListener('keyup', handlePowerUpKeyUp)
+    isKeyHeldOnPowerUpShow.value = false
   }
 })
 

@@ -45,7 +45,13 @@ export class GameManager {
     private gameOverTimer: number = 0
     private hasTriggeredMassiveExplosion: boolean = false
     private score: number = 0
+    private playerLevel: number = 0
+    private scoreForNextPowerUp: number = 1000
+    private currentPowerUpInterval: number = 1000
+    private pendingPowerUpSelections: number = 0
+    private isWaitingForNextWaveTriggerPending: boolean = false
     private scoreText: Text | null = null
+    private levelText: Text | null = null
     private waveText: Text | null = null
     private announcementText: Text | null = null
     private powerUpListText: Text | null = null
@@ -67,6 +73,7 @@ export class GameManager {
 
     // パワーアップ
     public isPowerUpSelecting: boolean = false
+    public powerUpReason: 'wave' | 'level' | null = null
     public currentPowerUpOptions: PowerUp[] = []
     private availablePowerUps: PowerUp[] = []
     public rarityBonus: number = 0
@@ -110,6 +117,11 @@ export class GameManager {
         this.uiContainer.visible = false
         this.gameOverTimer = 0
         this.score = 0 // スコアリセット
+        this.playerLevel = 0
+        this.scoreForNextPowerUp = 1000
+        this.currentPowerUpInterval = 1000
+        this.pendingPowerUpSelections = 0
+        this.isWaitingForNextWaveTriggerPending = false
         this.currentWave = 0
         this.waveEnemiesSpawned = 0
         this.totalEnemiesInWave = 0
@@ -119,6 +131,7 @@ export class GameManager {
         this.isWaitingForNextWave = false
         this.waveTransitionTimer = 0
         this.hasTriggeredMassiveExplosion = false
+        this.powerUpReason = null
         this.rarityBonus = 0
         this.powerUpLevels = {}
 
@@ -274,7 +287,7 @@ export class GameManager {
 
         const style = new TextStyle({
             fontFamily: 'Orbitron, sans-serif',
-            fontSize: 24,
+            fontSize: 20, // 少し小さくして情報を詰め込む
             fontWeight: 'bold',
             fill: '#ffffff',
             dropShadow: {
@@ -286,11 +299,20 @@ export class GameManager {
             }
         })
 
-        this.scoreText = new Text({ text: 'WAVE 0  SCORE: 000000', style })
-        this.scoreText.anchor.set(0, 0.5) // 縦の中央を基準にする
+        this.scoreText = new Text({ text: 'WAVE 1  SCORE: 000000', style })
+        this.scoreText.anchor.set(0, 0.5)
         this.scoreText.x = 20
-        this.scoreText.y = 30 // HPゲージ (y=20, h=20) の中心 y=30 に合わせる
+        this.scoreText.y = 30
         this.uiContainer.addChild(this.scoreText)
+
+        // --- Level UI (Second line) ---
+        const levelStyle = style.clone()
+        levelStyle.fontSize = 18
+        this.levelText = new Text({ text: 'Lv.0 (NEXT: 1000)', style: levelStyle })
+        this.levelText.anchor.set(0, 0.5)
+        this.levelText.x = 20
+        this.levelText.y = 60
+        this.uiContainer.addChild(this.levelText)
 
         // --- パワーアップ一覧テキスト ---
         const puStyle = new TextStyle({
@@ -308,7 +330,7 @@ export class GameManager {
         this.powerUpListText = new Text({ text: '', style: puStyle })
         this.powerUpListText.anchor.set(0, 0)
         this.powerUpListText.x = 20
-        this.powerUpListText.y = 50
+        this.powerUpListText.y = 85
         this.powerUpListText.alpha = 0.85
         this.uiContainer.addChild(this.powerUpListText)
 
@@ -339,8 +361,6 @@ export class GameManager {
     }
 
     private clearWave(): void {
-        if (this.isPowerUpSelecting) return
-
         // Waveクリア時の回復 (HP 50%回復, パワー全回復)
         if (this.player.isAlive) {
             this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.maxHp * 0.5)
@@ -348,11 +368,20 @@ export class GameManager {
             this.player.isLaserOverheated = false // オーバーヒートも強制解除
         }
 
-        // 即座にパワーアップ選択肢を生成（UI側でCLEAR表示と統合する）
-        this.generatePowerUpOptions()
+        // 強化回数にカウントしない強化を追加
+        this.pendingPowerUpSelections++
+        this.powerUpReason = 'wave'
+        this.isWaitingForNextWaveTriggerPending = true
+
+        if (!this.isPowerUpSelecting) {
+            this.generatePowerUpOptions()
+        }
     }
 
     public generatePowerUpOptions(): void {
+        this.isPaused = true
+        this.isPowerUpSelecting = true
+
         const options: PowerUp[] = []
         // 最大レベルに達していないものだけを抽出
         const pool = this.availablePowerUps.filter(p => {
@@ -423,13 +452,25 @@ export class GameManager {
             }
 
             this.updatePowerUpListUI()
+            this.pendingPowerUpSelections--
 
-            this.isPowerUpSelecting = false
-            this.currentPowerUpOptions = []
+            if (this.pendingPowerUpSelections > 0) {
+                // まだ未適用の強化がある場合は次を表示
+                // キューの中に 'wave' が残っているかチェックして理由を維持
+                this.generatePowerUpOptions()
+            } else {
+                this.isPowerUpSelecting = false
+                this.powerUpReason = null
+                this.isPaused = false
+                this.currentPowerUpOptions = []
 
-            // 選択後、次のWaveへ
-            this.isWaitingForNextWave = true
-            this.showAnnouncement('', 60) // 1秒間だけ表示なし（ウェイト）
+                // ウェーブクリア経由だった場合は次のWaveへ
+                if (this.isWaitingForNextWaveTriggerPending) {
+                    this.isWaitingForNextWaveTriggerPending = false
+                    this.isWaitingForNextWave = true
+                    this.showAnnouncement('', 60) // 1秒間だけ表示なし（ウェイト）
+                }
+            }
         }
     }
 
@@ -472,12 +513,42 @@ export class GameManager {
                 }
             }
         }
+
+        // WAVE更新時にテキストを同期
+        if (this.scoreText && this.scoreText.text.includes('WAVE')) {
+            const currentText = `WAVE ${this.currentWave}`
+            if (!this.scoreText.text.startsWith(currentText)) {
+                this.addScore(0)
+            }
+        }
     }
 
     private addScore(amount: number): void {
         this.score += amount
+
         if (this.scoreText) {
             this.scoreText.text = `WAVE ${this.currentWave}  SCORE: ${this.score.toString().padStart(6, '0')}`
+        }
+
+        // スコアベースの強化判定
+        let leveledUp = false
+        while (this.score >= this.scoreForNextPowerUp) {
+            this.playerLevel++
+            this.pendingPowerUpSelections++
+            this.powerUpReason = 'level'
+
+            // 次のしきい値を計算 (階段状に増加: +500点ずつ間隔を広げる)
+            this.currentPowerUpInterval += 500
+            this.scoreForNextPowerUp += this.currentPowerUpInterval
+            leveledUp = true
+        }
+
+        if (leveledUp && !this.isPowerUpSelecting) {
+            this.generatePowerUpOptions()
+        }
+
+        if (this.levelText) {
+            this.levelText.text = `Lv.${this.playerLevel} (NEXT: ${this.scoreForNextPowerUp})`
         }
     }
 
@@ -786,9 +857,13 @@ export class GameManager {
             this.scoreText.x = 20
             this.scoreText.y = 30
         }
+        if (this.levelText) {
+            this.levelText.x = 20
+            this.levelText.y = 60
+        }
         if (this.powerUpListText) {
             this.powerUpListText.x = 20
-            this.powerUpListText.y = 50
+            this.powerUpListText.y = 85
         }
         if (this.announcementText) {
             this.announcementText.x = width / 2
