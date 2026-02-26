@@ -162,6 +162,7 @@ export class AceFighter extends Fighter {
         const targetVelY = -Math.cos(this.rotation) * currentSpeed
 
         const lerpFactor = this.isRepositioning ? 0.2 : 0.15
+        this.velocity.x += (targetVelX - this.velocity.x) * lerpFactor
         this.velocity.y += (targetVelY - this.velocity.y) * lerpFactor
 
         // --- 航跡 (Trail) ---
