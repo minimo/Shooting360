@@ -1086,15 +1086,20 @@ export class GameManager {
      */
     private spawnHitEffect(x: number, y: number, color: number = 0xffffff, sourceVx: number = 0, sourceVy: number = 0): void {
         // 小さなフラッシュ（爆発）
-        this.spawnExplosion(x, y, color, 0.3, 10, true, sourceVx, sourceVy)
+        // 180度逆に出るように速度を反転
+        this.spawnExplosion(x, y, color, 0.3, 10, true, -sourceVx, -sourceVy)
 
-        // 火花パーティクル（元オブジェクトの慣性を加算）
-        const particleCount = 5 + Math.floor(Math.random() * 5)
+        // 反射方向の基本角度
+        const reflectAngle = Math.atan2(-sourceVy, -sourceVx)
+
+        // 火花パーティクル（反射方向に扇形に放出）
+        const particleCount = 8 + Math.floor(Math.random() * 8)
         for (let i = 0; i < particleCount; i++) {
-            const angle = Math.random() * Math.PI * 2
-            const speed = 2 + Math.random() * 4
-            const pvx = Math.cos(angle) * speed + sourceVx
-            const pvy = Math.sin(angle) * speed + sourceVy
+            // 反射方向を中心に ±72度（合計144度）程度の広がり（扇形）
+            const angle = reflectAngle + (Math.random() - 0.5) * Math.PI * 0.8
+            const speed = 3 + Math.random() * 12
+            const pvx = Math.cos(angle) * speed
+            const pvy = Math.sin(angle) * speed
             const particle = new Particle(x, y, pvx, pvy, 15 + Math.random() * 10, color, 2)
             this.addObject(particle)
         }

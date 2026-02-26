@@ -44,6 +44,10 @@ export class Particle extends GameObject {
         // フェードアウト
         this.display.alpha = this.life / this.maxLife
 
+        // 速度の減衰（少し強めに）
+        this.velocity.x *= 0.92
+        this.velocity.y *= 0.92
+
         // 移動
         this.updatePosition(delta)
     }
