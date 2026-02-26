@@ -577,8 +577,8 @@ onUnmounted(() => {
 
 .powerup-card {
   width: 280px;
-  height: 450px; /* 厳密に固定 */
-  padding: 2.5rem 2rem;
+  height: 320px; /* 厳密に固定 */
+  padding: 2rem 1.5rem;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
   border: 2px solid rgba(0, 255, 204, 0.3);
   border-radius: 16px;
