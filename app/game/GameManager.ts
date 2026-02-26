@@ -11,6 +11,7 @@ import { BackgroundObject } from './BackgroundObject'
 import { HomingMissile } from './HomingMissile'
 import { HomingExplosion } from './HomingExplosion'
 import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
+import { Afterimage } from './Afterimage'
 import type { InputState } from '~/composables/useInput'
 import { Gauge } from './Gauge'
 import { Laser, LaserState } from './Laser'
@@ -32,7 +33,7 @@ export class GameManager {
     private app: Application | null = null
     private mainContainer: Container = new Container()
     private minimap: Minimap = new Minimap()
-    public player: Player = new Player(0, 0, () => { })
+    public player: Player = new Player(0, 0, () => { }, () => { })
     private laser: Laser = new Laser(0, 0)
     private objects: GameObject[] = []
     private screenWidth: number = 0
@@ -143,7 +144,7 @@ export class GameManager {
         this.addObject(this.laser)
 
         // --- Player ---
-        this.player = new Player(0, 0, spawnBullet)
+        this.player = new Player(0, 0, spawnBullet, this.spawnAfterimage.bind(this))
         this.player.screenWidth = this.screenWidth
         this.player.screenHeight = this.screenHeight
         this.mainContainer.addChild(this.player.display)
@@ -258,6 +259,11 @@ export class GameManager {
     /**
      * 誘導ミサイル生成
      */
+    private spawnAfterimage(x1: number, y1: number, x2: number, y2: number, life: number = 20, color: number = 0xffffff, alpha: number = 1.0): void {
+        const afterimage = new Afterimage(x1, y1, x2, y2, life, color, alpha)
+        this.addObject(afterimage)
+    }
+
     private spawnHomingMissile(x: number, y: number, angle: number): void {
         const missile = new HomingMissile(x, y, angle, this.player)
         this.addObject(missile)
@@ -848,7 +854,8 @@ export class GameManager {
         if (rand < aceRate) {
             const enemy = new AceFighter(x, y, this.player,
                 (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'),
-                (obj) => this.addObject(obj)
+                (obj: GameObject) => this.addObject(obj),
+                this.spawnAfterimage.bind(this)
             )
             this.addObject(enemy)
         } else if (rand < aceRate + sniperRate) {

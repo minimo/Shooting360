@@ -1,10 +1,13 @@
 import { Graphics, Container } from 'pixi.js'
-import { GameObject } from './GameObject'
+import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
 import { Gauge } from './Gauge'
 import type { InputState } from '~/composables/useInput'
 
 /** 弾発射コールバック型 */
 export type SpawnBulletFn = (x: number, y: number, angle: number, side?: 'player' | 'enemy') => void
+
+/** 残像生成コールバック型 */
+export type SpawnAfterimageFn = (x1: number, y1: number, x2: number, y2: number, life?: number, color?: number, alpha?: number) => void
 
 /**
  * 自機クラス
@@ -71,10 +74,15 @@ export class Player extends GameObject {
     public override side: 'player' | 'enemy' = 'player'
 
     private spawnBullet: SpawnBulletFn
+    private spawnAfterimage: SpawnAfterimageFn
+    private lastTrailPosition: { x: number; y: number } = { x: 0, y: 0 }
+    private lastTrailEndPosition: { x: number; y: number } = { x: 0, y: 0 }
+    private hasInitialTrailPoint: boolean = false
 
-    constructor(x: number, y: number, spawnBullet: SpawnBulletFn) {
+    constructor(x: number, y: number, spawnBullet: SpawnBulletFn, spawnAfterimage: SpawnAfterimageFn) {
         super(x, y)
         this.spawnBullet = spawnBullet
+        this.spawnAfterimage = spawnAfterimage
 
         this.powerGauge = new Gauge({
             width: 40,
@@ -90,6 +98,8 @@ export class Player extends GameObject {
         this.createGraphics()
         this.display.addChild(this.powerGauge)
         this.display.visible = true
+
+        this.lastTrailPosition = { x: this.position.x, y: this.position.y }
     }
 
     /**
@@ -193,6 +203,58 @@ export class Player extends GameObject {
             const ratio = currentMaxSpeed / speed
             this.velocity.x *= ratio
             this.velocity.y *= ratio
+        }
+
+        // --- 航跡 (Trail) ---
+        // ユーザーの要望により、上キーを押している間、またはブースト中のみ新しい線が出るようにする
+        if (input.up || this.isBoosting) {
+            // 現在の「終点」となる座標（機体後方10px）を計算
+            const currentOffX = -Math.sin(this.rotation) * 10
+            const currentOffY = Math.cos(this.rotation) * 10
+            const currentEndX = this.position.x + currentOffX
+            const currentEndY = this.position.y + currentOffY
+
+            if (!this.hasInitialTrailPoint) {
+                this.lastTrailPosition.x = this.position.x
+                this.lastTrailPosition.y = this.position.y
+                this.lastTrailEndPosition.x = currentEndX
+                this.lastTrailEndPosition.y = currentEndY
+                this.hasInitialTrailPoint = true
+            }
+
+            // 前回の「生成判定用中心点」からの距離を計算（ワールドラップを考慮）
+            let tdx = this.position.x - this.lastTrailPosition.x
+            let tdy = this.position.y - this.lastTrailPosition.y
+            if (tdx > WORLD_HALF) tdx -= WORLD_SIZE
+            if (tdx < -WORLD_HALF) tdx += WORLD_SIZE
+            if (tdy > WORLD_HALF) tdy -= WORLD_SIZE
+            if (tdy < -WORLD_HALF) tdy += WORLD_SIZE
+
+            const distSinceLastTrail = Math.sqrt(tdx * tdx + tdy * tdy)
+            const trailInterval = this.isBoosting ? 5 : 10
+
+            if (distSinceLastTrail >= trailInterval) {
+                // ワールドラップが起きていない場合のみ描画
+                if (distSinceLastTrail < WORLD_HALF) {
+                    // 前回の「終点」から、現在の「終点」へ直接繋ぐことで隙間を排除
+                    this.spawnAfterimage(
+                        this.lastTrailEndPosition.x,
+                        this.lastTrailEndPosition.y,
+                        currentEndX,
+                        currentEndY,
+                        40, 0xffffff, 1.0
+                    )
+                }
+
+                // 次回の始点として現在の情報を保存
+                this.lastTrailPosition.x = this.position.x
+                this.lastTrailPosition.y = this.position.y
+                this.lastTrailEndPosition.x = currentEndX
+                this.lastTrailEndPosition.y = currentEndY
+            }
+        } else {
+            // 上キーを離した時は次の描画開始のために位置をリセット
+            this.hasInitialTrailPoint = false
         }
 
         this.updatePosition(delta)
