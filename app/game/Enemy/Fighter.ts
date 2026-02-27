@@ -36,12 +36,16 @@ export class Fighter extends GameObject {
     private evadeTimer: number = 0
     private targetEvadeAngle: number = 0
 
-    constructor(x: number, y: number, player: Player, spawnBullet: SpawnBulletFn) {
+    constructor(x: number, y: number, player: Player, spawnBullet: SpawnBulletFn, wave: number) {
         super(x, y)
         this.side = 'enemy'
         this.radius = 14
         this.player = player
         this.spawnBullet = spawnBullet
+
+        // 射撃間隔の計算：初期は長く、Waveが進むにつれて短くする
+        // Wave 1: 120 (2.0s), Wave 10: 30 (0.5s)
+        this.fireInterval = Math.max(30, 120 - (wave - 1) * 10)
 
         // 初期状態では自機の方を向く
         this.lookAtPlayer()

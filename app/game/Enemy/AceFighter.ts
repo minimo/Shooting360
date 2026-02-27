@@ -41,11 +41,15 @@ export class AceFighter extends Fighter {
     private lastTrailEndPosition: { x: number; y: number } = { x: 0, y: 0 }
     private hasInitialTrailPoint: boolean = false
 
-    constructor(x: number, y: number, player: Player, spawnBullet: SpawnBulletFn, _addObject: (obj: GameObject) => void, spawnAfterimage: SpawnAfterimageFn) {
-        super(x, y, player, spawnBullet)
+    constructor(x: number, y: number, player: Player, spawnBullet: SpawnBulletFn, _addObject: (obj: GameObject) => void, spawnAfterimage: SpawnAfterimageFn, wave: number) {
+        super(x, y, player, spawnBullet, wave)
         this.spawnAfterimage = spawnAfterimage
         this.lastTrailPosition = { x: this.position.x, y: this.position.y }
         this.lastTrailEndPosition = { x: this.position.x, y: this.position.y }
+
+        // エース機のバースト間クールダウン調整
+        // Wave 4(出現開始): 90フレーム (1.5s), Wave 10: 30フレーム (0.5s)
+        this.fireInterval = Math.max(30, 120 - (wave - 1) * 10)
 
         // 初回射撃までのランダムなディレイ
         this.fireCooldown = Math.random() * this.fireInterval

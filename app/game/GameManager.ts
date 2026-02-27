@@ -930,14 +930,15 @@ export class GameManager {
             const enemy = new AceFighter(x, y, this.player,
                 (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'),
                 (obj: GameObject) => this.addObject(obj),
-                this.spawnAfterimage.bind(this)
+                this.spawnAfterimage.bind(this),
+                this.currentWave
             )
             this.addObject(enemy)
         } else if (rand < aceRate + sniperRate) {
-            const sniper = new MissileFlower(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnHomingMissile(ex, ey, ea))
+            const sniper = new MissileFlower(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnHomingMissile(ex, ey, ea), this.currentWave)
             this.addObject(sniper)
         } else {
-            const enemy = new Fighter(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'))
+            const enemy = new Fighter(x, y, this.player, (ex: number, ey: number, ea: number) => this.spawnBullet(ex, ey, ea, 'enemy'), this.currentWave)
             this.addObject(enemy)
         }
     }

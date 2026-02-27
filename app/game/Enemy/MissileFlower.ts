@@ -17,7 +17,7 @@ export class MissileFlower extends GameObject {
     /** 回転速度（ラジアン/フレーム） */
     public rotationSpeed: number = 0.05
 
-    /** 射撃間隔（3秒 = 180フレーム） */
+    /** 射撃間隔（Waveに応じて変動） */
     public fireInterval: number = 180
     private fireCooldown: number = 0
 
@@ -37,12 +37,16 @@ export class MissileFlower extends GameObject {
     /** 誘導ミサイル生成コールバック */
     private spawnHomingMissile: SpawnHomingMissileFn
 
-    constructor(x: number, y: number, player: Player, spawnHomingMissile: SpawnHomingMissileFn) {
+    constructor(x: number, y: number, player: Player, spawnHomingMissile: SpawnHomingMissileFn, wave: number) {
         super(x, y)
         this.side = 'enemy'
         this.radius = 36
         this.player = player
         this.spawnHomingMissile = spawnHomingMissile
+
+        // 射撃間隔の計算：初期は長く、Waveが進むにつれて短くする
+        // Wave 1: 300 (5.0s), Wave 10: 120 (2.0s), Wave 13~: 60 (1.0s)
+        this.fireInterval = Math.max(60, 300 - (wave - 1) * 20)
 
         this.lookAtPlayer()
         this.createGraphics()
