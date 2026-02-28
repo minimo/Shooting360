@@ -1,6 +1,7 @@
 import { Graphics } from 'pixi.js'
 import { Fighter } from './Fighter'
 import { GameObject, WORLD_SIZE, WORLD_HALF } from '../GameObject'
+import { TrailEffect } from '../TrailEffect'
 import type { Player, SpawnBulletFn, SpawnAfterimageFn } from '../Player'
 
 /**
@@ -37,15 +38,12 @@ export class AceFighter extends Fighter {
     private readonly burstInterval: number = 6 // バースト内の発射間隔（フレーム）
 
     private spawnAfterimage: SpawnAfterimageFn
-    private lastTrailPosition: { x: number; y: number } = { x: 0, y: 0 }
-    private lastTrailEndPosition: { x: number; y: number } = { x: 0, y: 0 }
-    private hasInitialTrailPoint: boolean = false
+    private trail: TrailEffect
 
     constructor(x: number, y: number, player: Player, spawnBullet: SpawnBulletFn, _addObject: (obj: GameObject) => void, spawnAfterimage: SpawnAfterimageFn, wave: number) {
         super(x, y, player, spawnBullet, wave)
         this.spawnAfterimage = spawnAfterimage
-        this.lastTrailPosition = { x: this.position.x, y: this.position.y }
-        this.lastTrailEndPosition = { x: this.position.x, y: this.position.y }
+        this.trail = new TrailEffect(spawnAfterimage, 10, 40, 0xffffff, 1.0, 10)
 
         // エース機のバースト間クールダウン調整
         // Wave 4(出現開始): 90フレーム (1.5s), Wave 10: 30フレーム (0.5s)
@@ -64,10 +62,10 @@ export class AceFighter extends Fighter {
         const g = new Graphics()
         // 自機と同じ鏃（やじり）型の形状
         g.poly([
-            0, -22,
-            16, 18,
-            0, 8,
-            -16, 18
+            0, -16,
+            12, 13,
+            0, 6,
+            -12, 13
         ])
         // 赤色
         g.fill({ color: 0xff3333, alpha: 1 })
@@ -170,47 +168,7 @@ export class AceFighter extends Fighter {
         this.velocity.y += (targetVelY - this.velocity.y) * lerpFactor
 
         // --- 航跡 (Trail) ---
-        // 現在の「終点」となる座標（機体後方10px）を計算
-        const currentOffX = -Math.sin(this.rotation) * 10
-        const currentOffY = Math.cos(this.rotation) * 10
-        const currentEndX = this.position.x + currentOffX
-        const currentEndY = this.position.y + currentOffY
-
-        if (!this.hasInitialTrailPoint) {
-            this.lastTrailPosition.x = this.position.x
-            this.lastTrailPosition.y = this.position.y
-            this.lastTrailEndPosition.x = currentEndX
-            this.lastTrailEndPosition.y = currentEndY
-            this.hasInitialTrailPoint = true
-        }
-
-        // 前回の生成地点からの距離を計算（ワールドラップを考慮）
-        let tdx = this.position.x - this.lastTrailPosition.x
-        let tdy = this.position.y - this.lastTrailPosition.y
-        if (tdx > WORLD_HALF) tdx -= WORLD_SIZE
-        if (tdx < -WORLD_HALF) tdx += WORLD_SIZE
-        if (tdy > WORLD_HALF) tdy -= WORLD_SIZE
-        if (tdy < -WORLD_HALF) tdy += WORLD_SIZE
-
-        const distSinceLastTrail = Math.sqrt(tdx * tdx + tdy * tdy)
-        if (distSinceLastTrail >= 10) { // ラインなので10px間隔
-            // ワールドラップが起きていない場合のみ描画
-            if (distSinceLastTrail < WORLD_HALF) {
-                // 前回の絶対座標（終点）から、現在の絶対座標（終点）へのラインを描画
-                this.spawnAfterimage(
-                    this.lastTrailEndPosition.x,
-                    this.lastTrailEndPosition.y,
-                    currentEndX,
-                    currentEndY,
-                    40, 0xffffff, 1.0
-                )
-            }
-
-            this.lastTrailPosition.x = this.position.x
-            this.lastTrailPosition.y = this.position.y
-            this.lastTrailEndPosition.x = currentEndX
-            this.lastTrailEndPosition.y = currentEndY
-        }
+        this.trail.update(this.position.x, this.position.y, this.rotation)
 
         this.updatePosition(delta)
 

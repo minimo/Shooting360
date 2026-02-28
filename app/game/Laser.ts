@@ -23,7 +23,7 @@ export class Laser extends GameObject {
     private rotationHistory: number[] = []
 
     /** レーザーの基本太さ */
-    public thickness: number = 4
+    public thickness: number = 3
 
     private coreGraphics: Graphics = new Graphics()
     private glowGraphics: Graphics = new Graphics()
@@ -80,7 +80,7 @@ export class Laser extends GameObject {
                 const relRot = rot - this.rotation
 
                 ag.rotation = relRot
-                ag.rect(-8, -this.maxLength, 16, this.maxLength)
+                ag.rect(-6, -this.maxLength, 12, this.maxLength)
                 ag.fill({ color: this.color, alpha: alpha })
             }
 

@@ -28,6 +28,9 @@ export class Afterimage extends GameObject {
     }
 
     private createGraphics(targetX: number, targetY: number, color: number, alpha: number): void {
+        // パラメータが不正な場合は描画をスキップ
+        if (isNaN(targetX) || isNaN(targetY)) return
+
         const g = new Graphics()
         // はっきりとした白いラインによる航跡
         g.moveTo(0, 0)
@@ -39,6 +42,8 @@ export class Afterimage extends GameObject {
     }
 
     public override update(delta: number, ..._args: any[]): void {
+        if (isNaN(delta)) return
+
         this.life -= delta
         if (this.life <= 0) {
             this.isAlive = false

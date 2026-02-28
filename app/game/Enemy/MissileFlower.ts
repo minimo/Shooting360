@@ -40,7 +40,7 @@ export class MissileFlower extends GameObject {
     constructor(x: number, y: number, player: Player, spawnHomingMissile: SpawnHomingMissileFn, wave: number) {
         super(x, y)
         this.side = 'enemy'
-        this.radius = 36
+        this.radius = 27
         this.player = player
         this.spawnHomingMissile = spawnHomingMissile
 
@@ -60,8 +60,8 @@ export class MissileFlower extends GameObject {
      */
     private createGraphics(): void {
         const g = new Graphics()
-        // 正方形（半径24相当）
-        g.rect(-24, -24, 48, 48)
+        // 正方形（半径18相当）
+        g.rect(-18, -18, 36, 36)
         g.fill({ color: 0x3333ff, alpha: 1 })
         this.display.addChild(g)
     }

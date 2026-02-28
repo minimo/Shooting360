@@ -1,6 +1,7 @@
 import { Graphics } from 'pixi.js'
 import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
-import type { Player } from './Player'
+import type { Player, SpawnAfterimageFn } from './Player'
+import { TrailEffect } from './TrailEffect'
 
 /**
  * 誘導ミサイル（ロケット型）
@@ -14,8 +15,8 @@ export class HomingMissile extends GameObject {
     /** 旋回性能（ラジアン/フレーム）従来の半分 */
     private turnSpeed: number = 0.025
 
-    /** 最大飛距離 */
-    public maxDistance: number = 2000
+    /** 最大飛距離 (画面横幅1317pxの約1.2倍) */
+    public maxDistance: number = 1580
 
     /** 耐久力 */
     public hp: number = 1
@@ -26,11 +27,12 @@ export class HomingMissile extends GameObject {
 
     private player: Player
     private origin: { x: number; y: number }
+    private trail: TrailEffect
 
-    constructor(x: number, y: number, angle: number, player: Player) {
+    constructor(x: number, y: number, angle: number, player: Player, spawnAfterimage: SpawnAfterimageFn) {
         super(x, y)
         this.side = 'enemy'
-        this.radius = 8
+        this.radius = 6
         this.rotation = angle
         this.player = player
         this.origin = { x, y }
@@ -39,19 +41,22 @@ export class HomingMissile extends GameObject {
         this.velocity.x = Math.sin(angle) * this.currentSpeed
         this.velocity.y = -Math.cos(angle) * this.currentSpeed
 
+        // 誘導弾の軌跡は白にする (0xffffff)
+        this.trail = new TrailEffect(spawnAfterimage, 8, 30, 0xffffff, 0.8, 8)
+
         this.createGraphics()
     }
 
     private createGraphics(): void {
         const g = new Graphics()
-        g.rect(-4, -10, 8, 20)
+        g.rect(-3, -7, 6, 15)
         g.fill({ color: 0x33ccff, alpha: 1 })
 
         const nose = new Graphics()
         nose.poly([
-            { x: -4, y: -10 },
-            { x: 4, y: -10 },
-            { x: 0, y: -16 }
+            { x: -3, y: -7 },
+            { x: 3, y: -7 },
+            { x: 0, y: -12 }
         ])
         nose.fill({ color: 0xff3333, alpha: 1 })
 
@@ -110,6 +115,7 @@ export class HomingMissile extends GameObject {
         this.velocity.y = -Math.cos(this.rotation) * this.currentSpeed
 
         this.updatePosition(delta)
+        this.trail.update(this.position.x, this.position.y, this.rotation)
 
         // --- 距離・寿命チェック ---
         // dx, dy はプレイヤーとの距離計算のために再計算が必要

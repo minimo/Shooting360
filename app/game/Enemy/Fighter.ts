@@ -39,7 +39,7 @@ export class Fighter extends GameObject {
     constructor(x: number, y: number, player: Player, spawnBullet: SpawnBulletFn, wave: number) {
         super(x, y)
         this.side = 'enemy'
-        this.radius = 14
+        this.radius = 10
         this.player = player
         this.spawnBullet = spawnBullet
 
@@ -61,9 +61,9 @@ export class Fighter extends GameObject {
     private createGraphics(): void {
         const g = new Graphics()
         g.poly([
-            { x: 0, y: -14 },
-            { x: -12, y: 10 },
-            { x: 12, y: 10 },
+            { x: 0, y: -10 },
+            { x: -9, y: 7 },
+            { x: 9, y: 7 },
         ])
         g.fill({ color: 0xff3333, alpha: 1 })
         this.display.addChild(g)

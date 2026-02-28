@@ -10,8 +10,8 @@ export class Bullet extends GameObject {
     /** 弾速 */
     public speed: number = 25
 
-    /** 最大飛距離 */
-    public maxDistance: number = 2400
+    /** 最大飛距離 (画面横幅1317pxの約1.2倍) */
+    public maxDistance: number = 1580
 
     /** ダメージ */
     public damage: number = 1
@@ -25,7 +25,7 @@ export class Bullet extends GameObject {
     constructor(x: number, y: number, angle: number, side: 'player' | 'enemy' = 'player', speedMultiplier: number = 1, damage: number = 1, isPiercing: boolean = false) {
         super(x, y)
         this.side = side
-        this.radius = 4
+        this.radius = 3
         this.rotation = angle
         this.origin = { x, y }
         this.damage = damage
@@ -43,8 +43,8 @@ export class Bullet extends GameObject {
      */
     private createGraphics(): void {
         const g = new Graphics()
-        // 細長い長方形の弾形状（高さ20px = 元の三角形の高さ10pxの2倍）
-        g.rect(-1.5, -5, 3, 10)
+        // 細長い長方形の弾形状
+        g.rect(-1, -3, 2, 7)
         g.fill({ color: 0xffff00, alpha: 1 })
         this.display.addChild(g)
     }

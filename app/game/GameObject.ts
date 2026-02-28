@@ -3,7 +3,7 @@ import { Container } from 'pixi.js'
 /**
  * ワールド設定
  */
-export const WORLD_SIZE = 8000
+export const WORLD_SIZE = 4000
 export const WORLD_HALF = WORLD_SIZE / 2
 
 /**

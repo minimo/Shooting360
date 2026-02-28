@@ -178,8 +178,8 @@ export class GameManager {
         this.uiContainer.addChild(this.hpGauge)
 
         // --- Background ---
-        // ワールドが2倍（面積4倍）になったため、密度を維持するために数を4倍(50->200)に増やす
-        for (let i = 0; i < 200; i++) {
+        // ワールドサイズが半分になったため、密度を維持するために数を1/4(200->50)に減らす
+        for (let i = 0; i < 50; i++) {
             const x = (Math.random() - 0.5) * WORLD_SIZE
             const y = (Math.random() - 0.5) * WORLD_SIZE
             this.addObject(new BackgroundObject(x, y))
@@ -278,7 +278,7 @@ export class GameManager {
     }
 
     private spawnHomingMissile(x: number, y: number, angle: number): void {
-        const missile = new HomingMissile(x, y, angle, this.player)
+        const missile = new HomingMissile(x, y, angle, this.player, this.spawnAfterimage.bind(this))
         this.addObject(missile)
     }
 
