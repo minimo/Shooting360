@@ -193,7 +193,7 @@ import { useInput, type InputState } from '~/composables/useInput'
 // --- CONSTANTS ---
 const GAME_WIDTH = 1920
 const GAME_HEIGHT = 1080
-const MINIMAP_SIZE = 320
+const MINIMAP_SIZE = 240
 
 // --- REFS ---
 const gameContainer = ref<HTMLDivElement | null>(null)
@@ -306,24 +306,38 @@ function drawMinimap(gm: GameManager): void {
 
   ctx.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE)
 
+  const radius = (MINIMAP_SIZE / 2) * 0.9 // 少し内側に円を描画
+  const centerX = MINIMAP_SIZE / 2
+  const centerY = MINIMAP_SIZE / 2
+
+  // クリッピング設定（円形以外を描画しないようにする）
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+  ctx.clip()
+
   // 背景
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
-  ctx.beginPath()
-  ctx.roundRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE, 8)
   ctx.fill()
-
-  // 枠
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)'
-  ctx.lineWidth = 1
-  ctx.stroke()
 
   // ドット描画
   for (const dot of gm.minimapDots) {
     const x = dot.nx * MINIMAP_SIZE
     const y = dot.ny * MINIMAP_SIZE
     ctx.fillStyle = dot.color
-    ctx.fillRect(x - dot.size / 2, y - dot.size / 2, dot.size, dot.size)
+    ctx.beginPath()
+    ctx.arc(x, y, dot.size / 2, 0, Math.PI * 2)
+    ctx.fill()
   }
+
+  ctx.restore()
+
+  // 枠（クリッピングの外側に描画）
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius - 1, 0, Math.PI * 2)
+  ctx.stroke()
 }
 
 // --- キーハンドラー ---
@@ -656,8 +670,9 @@ onUnmounted(() => {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  border-radius: 8px;
+  border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* Wave アナウンス */

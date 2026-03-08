@@ -20,7 +20,7 @@ export interface MinimapDot {
  */
 export class Minimap {
   public dots: MinimapDot[] = []
-  private range: number = 4000 // ワールドサイズ
+  private readonly DISPLAY_RADIUS: number = 1000 // ミニマップに表示する半径（ワールド座標単位）
 
   /**
    * 毎フレーム呼び出してドットデータを更新する
@@ -28,35 +28,61 @@ export class Minimap {
   public update(player: Player, objects: GameObject[]): void {
     this.dots = []
 
-    const toNorm = (x: number, y: number) => ({
-      nx: x / this.range + 0.5,
-      ny: y / this.range + 0.5,
-    })
+    const pX = player.position.x
+    const pY = player.position.y
 
-    const inRange = (nx: number, ny: number) => nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1
+    const toRelativeNorm = (x: number, y: number) => {
+      // プレイヤーからの相対座標（回り込み考慮）
+      let dx = x - pX
+      let dy = y - pY
+
+      const worldSize = 4000 // GameObject.WORLD_SIZE
+      const halfSize = worldSize / 2
+
+      if (dx > halfSize) dx -= worldSize
+      if (dx < -halfSize) dx += worldSize
+      if (dy > halfSize) dy -= worldSize
+      if (dy < -halfSize) dy += worldSize
+
+      return {
+        nx: dx / this.DISPLAY_RADIUS,
+        ny: dy / this.DISPLAY_RADIUS,
+      }
+    }
+
+    const inCircle = (nx: number, ny: number) => {
+      // 半径 1 の円内かどうか
+      return nx * nx + ny * ny <= 1
+    }
 
     // 弾・誘導弾
     for (const obj of objects) {
       if (!obj.isAlive) continue
       if (obj instanceof Bullet) {
-        const { nx, ny } = toNorm(obj.position.x, obj.position.y)
-        if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#ffffff', size: 2 })
+        const { nx, ny } = toRelativeNorm(obj.position.x, obj.position.y)
+        if (inCircle(nx, ny)) {
+          // ミニマップ上の座標 (0.5中心)
+          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: '#ffffff', size: 2 })
+        }
       } else if (obj instanceof HomingMissile) {
-        const { nx, ny } = toNorm(obj.position.x, obj.position.y)
-        if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#00ffff', size: 2 })
+        const { nx, ny } = toRelativeNorm(obj.position.x, obj.position.y)
+        if (inCircle(nx, ny)) {
+          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: '#00ffff', size: 2 })
+        }
       }
     }
 
     // 敵機
     for (const obj of objects) {
       if ((obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) {
-        const { nx, ny } = toNorm(obj.position.x, obj.position.y)
-        if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#ff3333', size: 4 })
+        const { nx, ny } = toRelativeNorm(obj.position.x, obj.position.y)
+        if (inCircle(nx, ny)) {
+          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: '#ff3333', size: 4 })
+        }
       }
     }
 
-    // 自機
-    const { nx, ny } = toNorm(player.position.x, player.position.y)
-    if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#00ffff', size: 4 })
+    // 自機（常に中心）
+    this.dots.push({ nx: 0.5, ny: 0.5, color: '#00ffff', size: 4 })
   }
 }
