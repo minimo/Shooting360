@@ -1,6 +1,40 @@
 <template>
   <div class="game-wrapper">
     <div ref="gameContainer" class="game-container" />
+
+    <!-- HUD（ゲームプレイ中のみ表示） -->
+    <div v-if="isHudVisible" class="hud">
+      <!-- スコア・Wave・レベル -->
+      <div class="score-area">
+        <div class="score-line">WAVE {{ currentWave }}&nbsp;&nbsp;SCORE: {{ scoreDisplay }}</div>
+        <div class="level-line">Lv.{{ playerLevel }} (NEXT: {{ scoreForNextPowerUp }})</div>
+        <div v-if="powerUpListText" class="powerup-list">{{ powerUpListText }}</div>
+      </div>
+
+      <!-- HP ゲージ -->
+      <div class="hp-bar-wrapper">
+        <div class="hp-bar-track">
+          <div
+            class="hp-bar-fill"
+            :style="{ width: hpPercent + '%', background: hpBarColor }"
+          />
+        </div>
+      </div>
+
+      <!-- ミニマップ -->
+      <canvas ref="minimapCanvas" class="minimap" :width="MINIMAP_SIZE" :height="MINIMAP_SIZE" />
+    </div>
+
+    <!-- Wave アナウンス -->
+    <div
+      v-if="announcementText"
+      class="announcement"
+      :style="{ opacity: announcementAlpha }"
+    >
+      {{ announcementText }}
+    </div>
+
+    <!-- タイトル画面 -->
     <div v-if="showOverlay" class="overlay">
       <div class="overlay-content">
         <h2>🎮 Shooting 360</h2>
@@ -16,7 +50,7 @@
       </div>
     </div>
 
-    <!-- ゲームオーバー画面 -->
+    <!-- ゲームオーバー -->
     <div v-if="showGameOver" class="overlay">
       <div class="overlay-content">
         <h2 class="game-over-text">GAME OVER</h2>
@@ -27,6 +61,7 @@
       </div>
     </div>
 
+    <!-- パワーアップ選択 -->
     <div v-if="showPowerUp" class="overlay powerup-overlay">
       <div class="overlay-content">
         <h2 class="powerup-title">
@@ -35,9 +70,9 @@
         </h2>
         <p class="powerup-subtitle">強化項目を選択してください</p>
         <div class="powerup-options">
-          <div 
-            v-for="(option, index) in mainPowerUpOptions" 
-            :key="option.id" 
+          <div
+            v-for="(option, index) in mainPowerUpOptions"
+            :key="option.id"
             class="powerup-card"
             :class="{ selected: index === selectedIndex }"
             @click="selectPowerUp(index)"
@@ -48,14 +83,18 @@
             </div>
             <h3>
               {{ option.name }}
-              <span class="level-badge" :style="{ visibility: (option.maxLevel && option.maxLevel > 1) ? 'visible' : 'hidden' }">
+              <span
+                class="level-badge"
+                :style="{
+                  visibility: option.maxLevel && option.maxLevel > 1 ? 'visible' : 'hidden',
+                }"
+              >
                 Lv {{ option.currentLevel || 0 }}/{{ option.maxLevel || 1 }}
               </span>
             </h3>
             <p>{{ option.description }}</p>
           </div>
         </div>
-
         <div v-if="skipPowerUpOption" class="powerup-skip-container">
           <button
             class="powerup-skip-button"
@@ -69,7 +108,7 @@
       </div>
     </div>
 
-    <!-- ポーズ画面 -->
+    <!-- ポーズ -->
     <div v-if="isPaused && !showPowerUp" class="overlay pause-overlay">
       <div class="overlay-content">
         <h2 class="pause-title">PAUSE</h2>
@@ -81,27 +120,32 @@
     <div v-if="showDebugMenu" class="overlay debug-overlay">
       <div class="overlay-content debug-content">
         <h2 class="debug-title">DEBUG MODE</h2>
-        
         <div class="debug-section debug-section-powerups">
           <h3>強化項目選択</h3>
           <div class="debug-powerup-grid">
-            <div 
-              v-for="(option, index) in availablePowerUps" 
-              :key="option.id" 
+            <div
+              v-for="(option, index) in availablePowerUps"
+              :key="option.id"
               class="debug-powerup-card"
-              :class="{ 
+              :class="{
                 selected: (debugPowerUpLevels[option.id] || 0) > 0,
-                highlighted: debugSelectedIndex === index
+                highlighted: debugSelectedIndex === index,
               }"
               @click="incrementDebugPowerUp(option.id, option.maxLevel || 1)"
               @contextmenu.prevent="decrementDebugPowerUp(option.id)"
               @mouseenter="debugSelectedIndex = index"
             >
               <h4>{{ option.name }}</h4>
-              <div 
+              <div
                 class="debug-level-badge"
                 :class="{ active: (debugPowerUpLevels[option.id] || 0) > 0 }"
-                :style="{ visibility: (option.maxLevel && option.maxLevel > 1) || (debugPowerUpLevels[option.id] || 0) > 0 ? 'visible' : 'hidden' }"
+                :style="{
+                  visibility:
+                    (option.maxLevel && option.maxLevel > 1) ||
+                    (debugPowerUpLevels[option.id] || 0) > 0
+                      ? 'visible'
+                      : 'hidden',
+                }"
               >
                 <template v-if="option.maxLevel && option.maxLevel > 1">
                   Lv {{ debugPowerUpLevels[option.id] || 0 }}/{{ option.maxLevel }}
@@ -113,18 +157,20 @@
             </div>
           </div>
         </div>
-
-        <div class="debug-section" :class="{ 'debug-section-highlighted': debugSelectedIndex === availablePowerUps.length }" @mouseenter="debugSelectedIndex = availablePowerUps.length">
+        <div
+          class="debug-section"
+          :class="{ 'debug-section-highlighted': debugSelectedIndex === availablePowerUps.length }"
+          @mouseenter="debugSelectedIndex = availablePowerUps.length"
+        >
           <h3>開始WAVE選択: {{ debugStartWave }}</h3>
           <div class="debug-wave-selector">
             <button @click="debugStartWave = Math.max(1, debugStartWave - 1)">◀</button>
-            <input type="range" v-model.number="debugStartWave" min="1" max="50">
+            <input type="range" v-model.number="debugStartWave" min="1" max="50" />
             <button @click="debugStartWave = Math.min(50, debugStartWave + 1)">▶</button>
           </div>
         </div>
-
         <div class="debug-actions">
-          <button 
+          <button
             class="debug-start-button"
             :class="{ highlighted: debugSelectedIndex === availablePowerUps.length + 1 }"
             @click="startDebugGame"
@@ -140,12 +186,18 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, onUnmounted, watch, computed } from 'vue'
-import { Application, Ticker } from 'pixi.js'
+import * as THREE from 'three'
 import { GameManager } from '~/game/GameManager'
 import { useInput, type InputState } from '~/composables/useInput'
 
+// --- CONSTANTS ---
+const GAME_WIDTH = 1920
+const GAME_HEIGHT = 1080
+const MINIMAP_SIZE = 320
+
 // --- REFS ---
 const gameContainer = ref<HTMLDivElement | null>(null)
+const minimapCanvas = ref<HTMLCanvasElement | null>(null)
 const showOverlay = ref(true)
 const showGameOver = ref(false)
 const showPowerUp = ref(false)
@@ -158,86 +210,153 @@ const availablePowerUps = ref<any[]>([])
 const debugPowerUpLevels = ref<Record<string, number>>({})
 const debugStartWave = ref(1)
 const currentWave = ref(0)
+const hpPercent = ref(100)
+const playerLevel = ref(0)
+const scoreForNextPowerUp = ref(1000)
+const scoreRaw = ref(0)
+const powerUpListText = ref('')
+const announcementText = ref('')
+const announcementAlpha = ref(0)
+const isKeyHeldOnPowerUpShow = ref(false)
 
-const mainPowerUpOptions = computed(() => {
-  return powerUpOptions.value.filter(opt => opt.id !== 'skip')
+const isHudVisible = computed(() => !showOverlay.value && !showDebugMenu.value)
+const scoreDisplay = computed(() => scoreRaw.value.toString().padStart(6, '0'))
+
+const hpBarColor = computed(() => {
+  if (hpPercent.value < 30) return '#ff3333'
+  if (hpPercent.value < 50) return '#ffff00'
+  return '#00ff88'
 })
 
-const skipPowerUpOption = computed(() => {
-  return powerUpOptions.value.find(opt => opt.id === 'skip')
-})
+const mainPowerUpOptions = computed(() => powerUpOptions.value.filter((opt) => opt.id !== 'skip'))
+const skipPowerUpOption = computed(() => powerUpOptions.value.find((opt) => opt.id === 'skip'))
 
 // --- Input ---
 const input = useInput()
-
-let app: Application | null = null
 const gameManager = shallowRef<GameManager | null>(null)
 
+// --- Three.js ---
+let renderer: THREE.WebGLRenderer | null = null
+let scene: THREE.Scene | null = null
+let camera: THREE.OrthographicCamera | null = null
+let animationId: number | null = null
+let lastTime: number = 0
+
 // --- Game Loop ---
-const gameLoop = (time: Ticker) => {
-  if (gameManager.value) {
-    if (gameManager.value.isGameOver && !showGameOver.value) {
-      showGameOver.value = true
-      // 入力重複防止のため少し待ってからイベント登録
-      setTimeout(() => {
-        window.addEventListener('keydown', restartOnKey)
-      }, 500)
-    }
-    // パワーアップ選択中またはオーバーレイ表示中は自機の操作入力を遮断する
-    const effectiveInput = (showPowerUp.value || showOverlay.value || showGameOver.value) 
-      ? { up: false, down: false, left: false, right: false, shoot: false, laser: false, boost: false }
-      : input.state
+const gameLoop = (time: number) => {
+  animationId = requestAnimationFrame(gameLoop)
 
-    gameManager.value.update(time.deltaMS / (1000/60), effectiveInput as InputState)
-    
-    // 常にWave数を同期
-    currentWave.value = gameManager.value.currentWave
+  const deltaMS = time - lastTime
+  lastTime = time
+  // PixiJS の deltaMS と同じ単位に合わせる（60fps基準の補正値）
+  const delta = deltaMS / (1000 / 60)
 
-    // パワーアップ状態の同期
-    showPowerUp.value = gameManager.value.isPowerUpSelecting
-    if (showPowerUp.value) {
-      powerUpOptions.value = gameManager.value.currentPowerUpOptions
-    }
+  const gm = gameManager.value
+  if (!gm || !renderer || !scene || !camera) return
 
-    // ポーズ状態の同期
-    isPaused.value = gameManager.value.isPaused
+  if (gm.isGameOver && !showGameOver.value) {
+    showGameOver.value = true
+    setTimeout(() => window.addEventListener('keydown', restartOnKey), 500)
+  }
+
+  const effectiveInput =
+    showPowerUp.value || showOverlay.value || showGameOver.value
+      ? ({
+          up: false,
+          down: false,
+          left: false,
+          right: false,
+          shoot: false,
+          laser: false,
+          boost: false,
+        } as InputState)
+      : (input.state as InputState)
+
+  gm.update(delta, effectiveInput)
+
+  // Vue リアクティブ値の同期
+  currentWave.value = gm.currentWave
+  hpPercent.value = gm.hpPercent
+  playerLevel.value = gm.playerLevel
+  scoreForNextPowerUp.value = gm.scoreForNextPowerUp
+  scoreRaw.value = gm.score
+  powerUpListText.value = gm.powerUpListEntries.join(' / ')
+  announcementText.value = gm.announcementText
+  announcementAlpha.value = gm.announcementAlpha
+
+  showPowerUp.value = gm.isPowerUpSelecting
+  if (showPowerUp.value) powerUpOptions.value = gm.currentPowerUpOptions
+  isPaused.value = gm.isPaused
+
+  // カメラシェイク
+  camera.position.set(gm.shakeOffset.x, gm.shakeOffset.y, 100)
+  camera.lookAt(gm.shakeOffset.x, gm.shakeOffset.y, 0)
+
+  // ミニマップ描画
+  drawMinimap(gm)
+
+  renderer.render(scene, camera)
+}
+
+function drawMinimap(gm: GameManager): void {
+  const canvas = minimapCanvas.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  ctx.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE)
+
+  // 背景
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+  ctx.beginPath()
+  ctx.roundRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE, 8)
+  ctx.fill()
+
+  // 枠
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+
+  // ドット描画
+  for (const dot of gm.minimapDots) {
+    const x = dot.nx * MINIMAP_SIZE
+    const y = dot.ny * MINIMAP_SIZE
+    ctx.fillStyle = dot.color
+    ctx.fillRect(x - dot.size / 2, y - dot.size / 2, dot.size, dot.size)
   }
 }
 
-// キー入力でスタートするハンドラ（Z or X キーのみ）
+// --- キーハンドラー ---
 const startOnKey = (e: KeyboardEvent) => {
-  if (showOverlay.value && gameManager.value) {
-    const key = e.key.toLowerCase()
-    if (key === 'z' || key === 'x') {
-      showOverlay.value = false
-      gameManager.value.isGameActive = true
-      window.removeEventListener('keydown', startOnKey)
-    } else if (key === 'q') {
-      // デバッグモード起動
-      showOverlay.value = false
-      showDebugMenu.value = true
-      availablePowerUps.value = gameManager.value.powerUps
-      window.removeEventListener('keydown', startOnKey)
-      window.addEventListener('keydown', handleDebugKey)
-    }
-  }
-}
-
-// リスタートハンドラ
-const restartOnKey = () => {
-  if (showGameOver.value && gameManager.value && app) {
-    showGameOver.value = false
-    window.removeEventListener('keydown', restartOnKey)
-    
-    // 現在のゲームマネージャーを破棄し、再生成
-    gameManager.value.destroy()
-    gameManager.value = new GameManager()
-    gameManager.value.init(app)
+  if (!showOverlay.value || !gameManager.value) return
+  const key = e.key.toLowerCase()
+  if (key === 'z' || key === 'x') {
+    showOverlay.value = false
     gameManager.value.isGameActive = true
+    window.removeEventListener('keydown', startOnKey)
+  } else if (key === 'q') {
+    showOverlay.value = false
+    showDebugMenu.value = true
+    availablePowerUps.value = gameManager.value.powerUps
+    window.removeEventListener('keydown', startOnKey)
+    window.addEventListener('keydown', handleDebugKey)
   }
 }
 
-// パワーアップ選択
+const restartOnKey = () => {
+  if (!showGameOver.value || !gameManager.value || !scene) return
+  showGameOver.value = false
+  window.removeEventListener('keydown', restartOnKey)
+
+  // シーンをクリア（背景色オブジェクト以外を削除）
+  while (scene.children.length > 0) scene.remove(scene.children[0]!)
+
+  gameManager.value.destroy()
+  gameManager.value = new GameManager()
+  gameManager.value.init(scene, GAME_WIDTH, GAME_HEIGHT)
+  gameManager.value.isGameActive = true
+}
+
 const selectPowerUp = (index: number) => {
   if (gameManager.value) {
     gameManager.value.selectPowerUp(index)
@@ -245,18 +364,14 @@ const selectPowerUp = (index: number) => {
   }
 }
 
-/** 排他的な通常弾強化グループ */
 const EXCLUSIVE_SHOT_IDS = ['3way', '5way', 'wide', 'piercing'] as const
 
 const incrementDebugPowerUp = (id: string, maxLevel: number = 1) => {
   const current = debugPowerUpLevels.value[id] || 0
   if (current < maxLevel) {
-    // 排他グループの場合、他をリセット
     if ((EXCLUSIVE_SHOT_IDS as readonly string[]).includes(id)) {
       for (const otherId of EXCLUSIVE_SHOT_IDS) {
-        if (otherId !== id) {
-          delete debugPowerUpLevels.value[otherId]
-        }
+        if (otherId !== id) delete debugPowerUpLevels.value[otherId]
       }
     }
     debugPowerUpLevels.value[id] = current + 1
@@ -265,9 +380,7 @@ const incrementDebugPowerUp = (id: string, maxLevel: number = 1) => {
 
 const decrementDebugPowerUp = (id: string) => {
   const current = debugPowerUpLevels.value[id] || 0
-  if (current > 0) {
-    debugPowerUpLevels.value[id] = current - 1
-  }
+  if (current > 0) debugPowerUpLevels.value[id] = current - 1
 }
 
 const startDebugGame = () => {
@@ -278,47 +391,32 @@ const startDebugGame = () => {
   }
 }
 
-// デバッグメニュー用のキーボード操作
 const handleDebugKey = (e: KeyboardEvent) => {
   if (!showDebugMenu.value) return
-
   const powerUpCount = availablePowerUps.value.length
-  const waveIndex = powerUpCount       // Wave選択行のインデックス
-  const startIndex = powerUpCount + 1  // スタートボタンのインデックス
+  const waveIndex = powerUpCount
+  const startIndex = powerUpCount + 1
 
-  if (e.key === 'ArrowLeft' || e.key === 'Left') {
-    if (debugSelectedIndex.value < powerUpCount) {
-      // グリッド内で左移動
+  if (e.key === 'ArrowLeft') {
+    if (debugSelectedIndex.value < powerUpCount)
       debugSelectedIndex.value = (debugSelectedIndex.value - 1 + powerUpCount) % powerUpCount
-    } else if (debugSelectedIndex.value === waveIndex) {
-      // Wave選択行: Waveを減らす
+    else if (debugSelectedIndex.value === waveIndex)
       debugStartWave.value = Math.max(1, debugStartWave.value - 1)
-    }
-  } else if (e.key === 'ArrowRight' || e.key === 'Right') {
-    if (debugSelectedIndex.value < powerUpCount) {
-      // グリッド内で右移動
+  } else if (e.key === 'ArrowRight') {
+    if (debugSelectedIndex.value < powerUpCount)
       debugSelectedIndex.value = (debugSelectedIndex.value + 1) % powerUpCount
-    } else if (debugSelectedIndex.value === waveIndex) {
-      // Wave選択行: Waveを増やす
+    else if (debugSelectedIndex.value === waveIndex)
       debugStartWave.value = Math.min(50, debugStartWave.value + 1)
-    }
-  } else if (e.key === 'ArrowUp' || e.key === 'Up') {
-    if (debugSelectedIndex.value === startIndex) {
-      debugSelectedIndex.value = waveIndex // スタート → Wave選択
-    } else if (debugSelectedIndex.value === waveIndex) {
-      debugSelectedIndex.value = 0 // Wave選択 → グリッド先頭
-    } else if (debugSelectedIndex.value >= 4) {
-      debugSelectedIndex.value -= 4 // 上の行へ (4列想定)
-    }
-  } else if (e.key === 'ArrowDown' || e.key === 'Down') {
+  } else if (e.key === 'ArrowUp') {
+    if (debugSelectedIndex.value === startIndex) debugSelectedIndex.value = waveIndex
+    else if (debugSelectedIndex.value === waveIndex) debugSelectedIndex.value = 0
+    else if (debugSelectedIndex.value >= 4) debugSelectedIndex.value -= 4
+  } else if (e.key === 'ArrowDown') {
     if (debugSelectedIndex.value < powerUpCount) {
-      if (debugSelectedIndex.value + 4 < powerUpCount) {
-        debugSelectedIndex.value += 4 // 下の行へ
-      } else {
-        debugSelectedIndex.value = waveIndex // グリッド → Wave選択
-      }
+      if (debugSelectedIndex.value + 4 < powerUpCount) debugSelectedIndex.value += 4
+      else debugSelectedIndex.value = waveIndex
     } else if (debugSelectedIndex.value === waveIndex) {
-      debugSelectedIndex.value = startIndex // Wave選択 → スタート
+      debugSelectedIndex.value = startIndex
     }
   } else if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter') {
     if (debugSelectedIndex.value < powerUpCount) {
@@ -328,9 +426,8 @@ const handleDebugKey = (e: KeyboardEvent) => {
       startDebugGame()
     }
   } else if (e.key === 'x' || e.key === 'X') {
-    if (debugSelectedIndex.value < powerUpCount) {
+    if (debugSelectedIndex.value < powerUpCount)
       decrementDebugPowerUp(availablePowerUps.value[debugSelectedIndex.value].id)
-    }
   } else if (e.key === 'w') {
     debugStartWave.value = Math.min(50, debugStartWave.value + 1)
   } else if (e.key === 's') {
@@ -338,12 +435,8 @@ const handleDebugKey = (e: KeyboardEvent) => {
   }
 }
 
-// パワーアップ選択用のキーボード操作
 const handlePowerUpKey = (e: KeyboardEvent) => {
-  if (!showPowerUp.value) return
-  if (e.repeat) return // 長押しによる連続入力を無効化
-  
-  // 表示時にキーが押されていた場合は、一度全て離すまで入力を無視
+  if (!showPowerUp.value || e.repeat) return
   if (isKeyHeldOnPowerUpShow.value) return
 
   const key = e.key.toLowerCase()
@@ -351,42 +444,37 @@ const handlePowerUpKey = (e: KeyboardEvent) => {
   const mainOptionsCount = mainPowerUpOptions.value.length
 
   if (key === 'z' || key === 'x' || key === 'enter') {
-    // Z, X, または Enterで決定
     selectPowerUp(selectedIndex.value)
-  } else if (e.key === 'ArrowLeft' || e.key === 'Left') {
-    if (selectedIndex.value < mainOptionsCount) {
-       selectedIndex.value = (selectedIndex.value - 1 + mainOptionsCount) % mainOptionsCount
-    }
-  } else if (e.key === 'ArrowRight' || e.key === 'Right') {
-    if (selectedIndex.value < mainOptionsCount) {
-       selectedIndex.value = (selectedIndex.value + 1) % mainOptionsCount
-    }
-  } else if (e.key === 'ArrowDown' || e.key === 'Down') {
-    if (selectedIndex.value < mainOptionsCount && skipPowerUpOption.value) {
-      selectedIndex.value = totalOptions - 1 // Skipボタンへ
-    }
-  } else if (e.key === 'ArrowUp' || e.key === 'Up') {
-    if (selectedIndex.value === totalOptions - 1) {
-       // 中央の強化項目に戻す
-       selectedIndex.value = Math.floor(mainOptionsCount / 2) 
-    }
+  } else if (e.key === 'ArrowLeft') {
+    if (selectedIndex.value < mainOptionsCount)
+      selectedIndex.value = (selectedIndex.value - 1 + mainOptionsCount) % mainOptionsCount
+  } else if (e.key === 'ArrowRight') {
+    if (selectedIndex.value < mainOptionsCount)
+      selectedIndex.value = (selectedIndex.value + 1) % mainOptionsCount
+  } else if (e.key === 'ArrowDown') {
+    if (selectedIndex.value < mainOptionsCount && skipPowerUpOption.value)
+      selectedIndex.value = totalOptions - 1
+  } else if (e.key === 'ArrowUp') {
+    if (selectedIndex.value === totalOptions - 1)
+      selectedIndex.value = Math.floor(mainOptionsCount / 2)
   }
 }
 
-// ポーズ用のキーボード操作
+const handlePowerUpKeyUp = () => {
+  if (!showPowerUp.value) return
+  const s = input.state
+  if (!s.up && !s.down && !s.left && !s.right && !s.shoot && !s.laser && !s.boost)
+    isKeyHeldOnPowerUpShow.value = false
+}
+
 const handlePauseKey = (e: KeyboardEvent) => {
-  // オーバーレイやゲームオーバー時は無視
   if (showOverlay.value || showGameOver.value || showPowerUp.value) return
-  
-  if (e.key === 'Escape') {
-    if (gameManager.value) {
-      gameManager.value.isPaused = !gameManager.value.isPaused
-      isPaused.value = gameManager.value.isPaused
-    }
+  if (e.key === 'Escape' && gameManager.value) {
+    gameManager.value.isPaused = !gameManager.value.isPaused
+    isPaused.value = gameManager.value.isPaused
   }
 }
 
-// フォーカス喪失（タブ切り替え等）時の自動ポーズ
 const handleBlur = () => {
   if (showOverlay.value || showGameOver.value || showPowerUp.value) return
   if (gameManager.value && !gameManager.value.isPaused) {
@@ -395,31 +483,12 @@ const handleBlur = () => {
   }
 }
 
-const isKeyHeldOnPowerUpShow = ref(false)
-
-// キーが離された時の判定
-const handlePowerUpKeyUp = () => {
-  if (!showPowerUp.value) return
-  
-  // すべてのキーが離されたかチェック
-  const s = input.state
-  if (!s.up && !s.down && !s.left && !s.right && !s.shoot && !s.laser && !s.boost) {
-    isKeyHeldOnPowerUpShow.value = false
-  }
-}
-
 watch(showPowerUp, (val) => {
   if (val) {
     selectedIndex.value = 0
-    // 画面が出た瞬間に「ガード状態」にする
-    // 何かキーが押されていたら確実にブロック
     const s = input.state
-    if (s.up || s.down || s.left || s.right || s.shoot || s.laser || s.boost) {
-      isKeyHeldOnPowerUpShow.value = true
-    } else {
-      isKeyHeldOnPowerUpShow.value = false
-    }
-
+    isKeyHeldOnPowerUpShow.value =
+      s.up || s.down || s.left || s.right || s.shoot || s.laser || s.boost
     window.addEventListener('keydown', handlePowerUpKey)
     window.addEventListener('keyup', handlePowerUpKeyUp)
   } else {
@@ -429,12 +498,9 @@ watch(showPowerUp, (val) => {
   }
 })
 
-// 固定解像度
-const GAME_WIDTH = 1920
-const GAME_HEIGHT = 1080
-
+// --- リサイズ対応 ---
 const fitCanvas = () => {
-  if (!gameContainer.value) return
+  if (!gameContainer.value || !renderer || !camera) return
   const wrapperW = window.innerWidth
   const wrapperH = window.innerHeight
   const scale = Math.min(wrapperW / GAME_WIDTH, wrapperH / GAME_HEIGHT)
@@ -444,42 +510,50 @@ const fitCanvas = () => {
   container.style.transform = `translate(-50%, -50%) scale(${scale})`
 }
 
-onMounted(async () => {
+// --- マウント ---
+onMounted(() => {
   if (!gameContainer.value) return
 
-  // タイトル画面用の入力待ち
   window.addEventListener('keydown', startOnKey)
-  // ポーズ用の入力待ち
   window.addEventListener('keydown', handlePauseKey)
-  // フォーカス喪失時の自動ポーズ
   window.addEventListener('blur', handleBlur)
 
-  // --- Pixi Application 初期化 (固定解像度 1920×1080) ---
-  app = new Application()
-  await app.init({
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
-    backgroundColor: 0x050510,
-    antialias: true,
-    resolution: 1,
-  })
+  // --- Three.js 初期化 ---
+  renderer = new THREE.WebGLRenderer({ antialias: true })
+  renderer.setSize(GAME_WIDTH, GAME_HEIGHT)
+  renderer.setClearColor(0x050510)
+  gameContainer.value.appendChild(renderer.domElement)
 
-  gameContainer.value.appendChild(app.canvas)
+  scene = new THREE.Scene()
+
+  // OrthographicCamera: 画面中央を原点、y-up
+  // left/right/top/bottom = ±width/2, ±height/2
+  camera = new THREE.OrthographicCamera(
+    -GAME_WIDTH / 2,
+    GAME_WIDTH / 2,
+    GAME_HEIGHT / 2,
+    -GAME_HEIGHT / 2,
+    -1000,
+    1000,
+  )
+  camera.position.set(0, 0, 100)
 
   // --- GameManager 初期化 ---
-  gameManager.value = new GameManager()
-  gameManager.value.init(app)
-  gameManager.value.resize(GAME_WIDTH, GAME_HEIGHT)
+  const gm = new GameManager()
+  gm.init(scene, GAME_WIDTH, GAME_HEIGHT)
+  gameManager.value = gm
 
-  // --- メインループ ---
-  app.ticker.add(gameLoop)
+  // --- メインループ開始 ---
+  lastTime = performance.now()
+  animationId = requestAnimationFrame(gameLoop)
 
-  // --- 初回フィット + リサイズ対応 ---
+  // --- リサイズ ---
   fitCanvas()
   window.addEventListener('resize', fitCanvas)
 })
 
 onUnmounted(() => {
+  if (animationId !== null) cancelAnimationFrame(animationId)
   window.removeEventListener('keydown', startOnKey)
   window.removeEventListener('keydown', restartOnKey)
   window.removeEventListener('keydown', handlePauseKey)
@@ -489,9 +563,9 @@ onUnmounted(() => {
     gameManager.value.destroy()
     gameManager.value = null
   }
-  if (app) {
-    app.destroy(true, { children: true })
-    app = null
+  if (renderer) {
+    renderer.dispose()
+    renderer = null
   }
 })
 </script>
@@ -519,6 +593,90 @@ onUnmounted(() => {
   display: block;
 }
 
+/* HUD */
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.score-area {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  color: #fff;
+  text-shadow: 1px 1px 4px #000;
+}
+
+.score-line {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.level-line {
+  font-size: 16px;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+.powerup-list {
+  font-size: 13px;
+  color: #ddeeff;
+  opacity: 0.85;
+}
+
+.hp-bar-wrapper {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+}
+
+.hp-bar-track {
+  height: 20px;
+  background: rgba(50, 50, 50, 0.8);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hp-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.1s ease, background 0.3s ease;
+}
+
+.minimap {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Wave アナウンス */
+.announcement {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -200px);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 64px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* オーバーレイ共通 */
 .overlay {
   position: absolute;
   top: 0;
@@ -579,14 +737,16 @@ onUnmounted(() => {
 
 /* パワーアップUI */
 .powerup-overlay {
-  background: rgba(0, 0, 0, 0.4); /* 背景をもっと明るく（透けるように） */
-  backdrop-filter: blur(4px);    /* ぼかしも弱く */
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
 }
 
 .powerup-title {
-  font-size: 4rem !important;    /* CLEAR表示に合わせて大きく */
+  font-size: 4rem !important;
   color: #ffff00 !important;
-  text-shadow: 0 0 30px rgba(255, 255, 0, 0.5), 0 0 10px rgba(0, 0, 0, 0.5) !important;
+  text-shadow:
+    0 0 30px rgba(255, 255, 0, 0.5),
+    0 0 10px rgba(0, 0, 0, 0.5) !important;
   margin-bottom: 0.5rem !important;
   letter-spacing: 0.2rem;
 }
@@ -603,18 +763,25 @@ onUnmounted(() => {
   gap: 20px;
   margin-top: 2rem;
   justify-content: center;
-  align-items: stretch; /* 全てのカードの高さを揃える */
+  align-items: stretch;
 }
 
 .powerup-card {
   width: 280px;
-  height: 320px; /* 厳密に固定 */
+  height: 320px;
   padding: 2rem 1.5rem;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
   border: 2px solid rgba(0, 255, 204, 0.3);
   border-radius: 16px;
   cursor: pointer;
-  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -622,8 +789,13 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-.powerup-card:hover, .powerup-card.selected {
-  background: linear-gradient(135deg, rgba(0, 255, 204, 0.2) 0%, rgba(0, 255, 204, 0.1) 100%);
+.powerup-card:hover,
+.powerup-card.selected {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 255, 204, 0.2) 0%,
+    rgba(0, 255, 204, 0.1) 100%
+  );
   border-color: #00ffcc;
   box-shadow: 0 0 30px rgba(0, 255, 204, 0.4);
 }
@@ -633,9 +805,15 @@ onUnmounted(() => {
 }
 
 @keyframes pulse-border {
-  0% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
-  50% { box-shadow: 0 0 25px rgba(0, 255, 204, 0.6); }
-  100% { box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); }
+  0% {
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(0, 255, 204, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+  }
 }
 
 .rarity-stars {
@@ -690,7 +868,8 @@ onUnmounted(() => {
   font-family: 'Segoe UI', sans-serif;
 }
 
-.powerup-skip-button:hover, .powerup-skip-button.selected {
+.powerup-skip-button:hover,
+.powerup-skip-button.selected {
   border-color: #fff;
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
@@ -698,7 +877,7 @@ onUnmounted(() => {
   transform: scale(1.05);
 }
 
-/* ポーズUI */
+/* ポーズ */
 .pause-overlay {
   background: rgba(0, 0, 0, 0.6);
 }
@@ -711,7 +890,7 @@ onUnmounted(() => {
   margin-bottom: 1rem !important;
 }
 
-/* デバッグメニューUI */
+/* デバッグ */
 .debug-overlay {
   background: rgba(0, 0, 0, 0.9);
 }
@@ -820,8 +999,6 @@ onUnmounted(() => {
   border: 1px solid rgba(0, 255, 204, 0.5);
 }
 
-
-
 .debug-section.debug-section-highlighted {
   background: rgba(255, 255, 0, 0.08);
   border-color: rgba(255, 255, 0, 0.4);
@@ -873,7 +1050,8 @@ onUnmounted(() => {
   box-shadow: 0 5px 15px rgba(255, 0, 255, 0.4);
 }
 
-.debug-start-button:hover, .debug-start-button.highlighted {
+.debug-start-button:hover,
+.debug-start-button.highlighted {
   transform: translateY(-5px) scale(1.05);
   box-shadow: 0 8px 25px rgba(255, 0, 255, 0.6);
   filter: brightness(1.2);

@@ -1,4 +1,3 @@
-import { Container, Graphics } from 'pixi.js'
 import type { Player } from './Player'
 import type { GameObject } from './GameObject'
 import { Bullet } from './Bullet'
@@ -6,88 +5,58 @@ import { Fighter } from './Enemy/Fighter'
 import { MissileFlower } from './Enemy/MissileFlower'
 import { HomingMissile } from './HomingMissile'
 
+export interface MinimapDot {
+  /** 0–1 正規化 X */
+  nx: number
+  /** 0–1 正規化 Y */
+  ny: number
+  color: string
+  size: number
+}
+
 /**
- * 全体マップ（ミニマップ）表示クラス
+ * ミニマップデータプロバイダー
+ * 描画は Vue 側の <canvas> で行うため、このクラスはデータ計算のみ担う。
  */
 export class Minimap {
-    public display: Container = new Container()
-    private bg: Graphics = new Graphics()
-    private mapGraphics: Graphics = new Graphics()
-    private size: number = 320 // 表示サイズ (px)
-    private range: number = 4000 // マップでカバーするワールド範囲 (+/- range)
+  public dots: MinimapDot[] = []
+  private range: number = 4000 // ワールドサイズ
 
-    constructor() {
-        this.display.addChild(this.bg)
-        this.display.addChild(this.mapGraphics)
-        this.drawBackground()
+  /**
+   * 毎フレーム呼び出してドットデータを更新する
+   */
+  public update(player: Player, objects: GameObject[]): void {
+    this.dots = []
+
+    const toNorm = (x: number, y: number) => ({
+      nx: x / this.range + 0.5,
+      ny: y / this.range + 0.5,
+    })
+
+    const inRange = (nx: number, ny: number) => nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1
+
+    // 弾・誘導弾
+    for (const obj of objects) {
+      if (!obj.isAlive) continue
+      if (obj instanceof Bullet) {
+        const { nx, ny } = toNorm(obj.position.x, obj.position.y)
+        if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#ffffff', size: 2 })
+      } else if (obj instanceof HomingMissile) {
+        const { nx, ny } = toNorm(obj.position.x, obj.position.y)
+        if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#00ffff', size: 2 })
+      }
     }
 
-    private drawBackground(): void {
-        this.bg.clear()
-        // 半透明の背景
-        this.bg.roundRect(0, 0, this.size, this.size, 8)
-        this.bg.fill({ color: 0x000000, alpha: 0.5 })
-        // 枠線
-        this.bg.stroke({ color: 0xffffff, width: 1, alpha: 0.3 })
+    // 敵機
+    for (const obj of objects) {
+      if ((obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) {
+        const { nx, ny } = toNorm(obj.position.x, obj.position.y)
+        if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#ff3333', size: 4 })
+      }
     }
 
-    /**
-     * 描画更新
-     */
-    public update(player: Player, objects: GameObject[]): void {
-        this.mapGraphics.clear()
-
-        // 座標変換ヘルパー (ワールド座標 -> ミニマップのローカル座標)
-        const toMap = (x: number, y: number) => {
-            const mx = ((x / (this.range * 2)) + 0.5) * this.size
-            const my = ((y / (this.range * 2)) + 0.5) * this.size
-            return { x: mx, y: my }
-        }
-
-        // 1. 弾・誘導弾 (2x2) - レーザーは除外
-        for (const obj of objects) {
-            if (!obj.isAlive) continue
-
-            if (obj instanceof Bullet) {
-                const pos = toMap(obj.position.x, obj.position.y)
-                if (this.isInMap(pos.x, pos.y)) {
-                    this.mapGraphics.rect(pos.x - 1, pos.y - 1, 2, 2)
-                    this.mapGraphics.fill({ color: 0xffffff })
-                }
-            } else if (obj instanceof HomingMissile) {
-                const pos = toMap(obj.position.x, obj.position.y)
-                if (this.isInMap(pos.x, pos.y)) {
-                    this.mapGraphics.rect(pos.x - 1, pos.y - 1, 2, 2)
-                    this.mapGraphics.fill({ color: 0x00ffff }) // 誘導弾はシアン
-                }
-            }
-        }
-
-        // 2. 敵機 (4x4, 赤)
-        for (const obj of objects) {
-            if ((obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) {
-                const pos = toMap(obj.position.x, obj.position.y)
-                if (this.isInMap(pos.x, pos.y)) {
-                    this.mapGraphics.rect(pos.x - 2, pos.y - 2, 4, 4)
-                    this.mapGraphics.fill({ color: 0xff3333 })
-                }
-            }
-        }
-
-        // 3. 自機 (4x4, シアン) - 目立つように大きめ
-        const pPos = toMap(player.position.x, player.position.y)
-        if (this.isInMap(pPos.x, pPos.y)) {
-            this.mapGraphics.rect(pPos.x - 2, pPos.y - 2, 4, 4)
-            this.mapGraphics.fill({ color: 0x00ffff })
-        }
-    }
-
-    private isInMap(x: number, y: number): boolean {
-        return x >= 0 && x <= this.size && y >= 0 && y <= this.size
-    }
-
-    public setPosition(x: number, y: number): void {
-        this.display.x = x
-        this.display.y = y
-    }
+    // 自機
+    const { nx, ny } = toNorm(player.position.x, player.position.y)
+    if (inRange(nx, ny)) this.dots.push({ nx, ny, color: '#00ffff', size: 4 })
+  }
 }

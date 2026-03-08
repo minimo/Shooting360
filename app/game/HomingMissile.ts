@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js'
+import * as THREE from 'three'
 import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
 import type { Player, SpawnAfterimageFn } from './Player'
 import { TrailEffect } from './TrailEffect'
@@ -7,141 +7,112 @@ import { TrailEffect } from './TrailEffect'
  * 誘導ミサイル（ロケット型）
  */
 export class HomingMissile extends GameObject {
-    /** 目標最大弾速 (自機16の3/4) */
-    public maxSpeed: number = 12.0
-    /** 現在の弾速 */
-    private currentSpeed: number = 3
+  public maxSpeed: number = 12.0
+  private currentSpeed: number = 3
+  private turnSpeed: number = 0.025
+  public maxDistance: number = 1580
+  public hp: number = 1
+  private expansionTime: number = 60
+  private elapsedFrames: number = 0
+  private player: Player
+  private origin: { x: number; y: number }
+  private trail: TrailEffect
+  public shouldExplode: boolean = false
+  public isMaxDistanceExplosion: boolean = false
 
-    /** 旋回性能（ラジアン/フレーム）従来の半分 */
-    private turnSpeed: number = 0.025
+  constructor(
+    x: number,
+    y: number,
+    angle: number,
+    player: Player,
+    spawnAfterimage: SpawnAfterimageFn,
+  ) {
+    super(x, y)
+    this.side = 'enemy'
+    this.radius = 6
+    this.rotation = angle
+    this.player = player
+    this.origin = { x, y }
+    this.velocity.x = Math.sin(angle) * this.currentSpeed
+    this.velocity.y = -Math.cos(angle) * this.currentSpeed
+    this.trail = new TrailEffect(spawnAfterimage, 8, 30, 0xffffff, 0.8, 8)
+    this.mesh.position.z = 0
+    this.createMesh()
+  }
 
-    /** 最大飛距離 (画面横幅1317pxの約1.2倍) */
-    public maxDistance: number = 1580
+  private createMesh(): void {
+    // Body: rect(-3,-7,6,15) → center (0, 0.5) in y-down → (0,-0.5) in y-up
+    const bodyGeo = new THREE.PlaneGeometry(6, 15)
+    const bodyMat = new THREE.MeshBasicMaterial({ color: 0x33ccff })
+    const body = new THREE.Mesh(bodyGeo, bodyMat)
+    body.position.set(0, -0.5, 0)
+    this.mesh.add(body)
 
-    /** 耐久力 */
-    public hp: number = 1
+    // Nose: [(-3,-7),(3,-7),(0,-12)] y-down → negate Y: [(-3,7),(3,7),(0,12)]
+    const shape = new THREE.Shape()
+    shape.moveTo(-3, 7)
+    shape.lineTo(3, 7)
+    shape.lineTo(0, 12)
+    shape.closePath()
+    const noseGeo = new THREE.ShapeGeometry(shape)
+    const noseMat = new THREE.MeshBasicMaterial({ color: 0xff3333, side: THREE.DoubleSide })
+    const nose = new THREE.Mesh(noseGeo, noseMat)
+    nose.position.z = 0.1
+    this.mesh.add(nose)
+  }
 
-    /** 展開時間（フレーム数、約1秒） */
-    private expansionTime: number = 60
-    private elapsedFrames: number = 0
+  public takeDamage(amount: number): void {
+    this.hp -= amount
+    if (this.hp <= 0) this.isAlive = false
+  }
 
-    private player: Player
-    private origin: { x: number; y: number }
-    private trail: TrailEffect
+  public override update(delta: number, ..._args: any[]): void {
+    this.elapsedFrames += delta
 
-    constructor(x: number, y: number, angle: number, player: Player, spawnAfterimage: SpawnAfterimageFn) {
-        super(x, y)
-        this.side = 'enemy'
-        this.radius = 6
-        this.rotation = angle
-        this.player = player
-        this.origin = { x, y }
+    if (this.elapsedFrames >= this.expansionTime) {
+      if (this.currentSpeed < this.maxSpeed) {
+        this.currentSpeed += 0.2 * delta
+        if (this.currentSpeed > this.maxSpeed) this.currentSpeed = this.maxSpeed
+      }
 
-        // 初期速度（低速で展開）
-        this.velocity.x = Math.sin(angle) * this.currentSpeed
-        this.velocity.y = -Math.cos(angle) * this.currentSpeed
+      let dx = this.player.position.x - this.position.x
+      let dy = this.player.position.y - this.position.y
+      if (dx > WORLD_HALF) dx -= WORLD_SIZE
+      if (dx < -WORLD_HALF) dx += WORLD_SIZE
+      if (dy > WORLD_HALF) dy -= WORLD_SIZE
+      if (dy < -WORLD_HALF) dy += WORLD_SIZE
 
-        // 誘導弾の軌跡は白にする (0xffffff)
-        this.trail = new TrailEffect(spawnAfterimage, 8, 30, 0xffffff, 0.8, 8)
+      const targetAngle = Math.atan2(dx, -dy)
+      let angleDiff = targetAngle - this.rotation
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2
 
-        this.createGraphics()
+      if (Math.abs(angleDiff) < this.turnSpeed * delta) {
+        this.rotation = targetAngle
+      } else {
+        this.rotation += Math.sign(angleDiff) * this.turnSpeed * delta
+      }
     }
 
-    private createGraphics(): void {
-        const g = new Graphics()
-        g.rect(-3, -7, 6, 15)
-        g.fill({ color: 0x33ccff, alpha: 1 })
+    this.velocity.x = Math.sin(this.rotation) * this.currentSpeed
+    this.velocity.y = -Math.cos(this.rotation) * this.currentSpeed
 
-        const nose = new Graphics()
-        nose.poly([
-            { x: -3, y: -7 },
-            { x: 3, y: -7 },
-            { x: 0, y: -12 }
-        ])
-        nose.fill({ color: 0xff3333, alpha: 1 })
+    this.updatePosition(delta)
+    this.trail.update(this.position.x, this.position.y, this.rotation)
 
-        this.display.addChild(g)
-        this.display.addChild(nose)
+    const distDx = this.position.x - this.origin.x
+    const distDy = this.position.y - this.origin.y
+    if (distDx * distDx + distDy * distDy > this.maxDistance * this.maxDistance) {
+      this.isAlive = false
+      this.shouldExplode = true
+      this.isMaxDistanceExplosion = true
     }
 
-    public takeDamage(amount: number): void {
-        this.hp -= amount
-        if (this.hp <= 0) {
-            this.isAlive = false
-        }
+    const pdx = this.player.position.x - this.position.x
+    const pdy = this.player.position.y - this.position.y
+    if (pdx * pdx + pdy * pdy < 40 * 40) {
+      this.isAlive = false
+      this.shouldExplode = true
     }
-
-    public override update(delta: number, ..._args: any[]): void {
-        this.elapsedFrames += delta
-
-        // --- 挙動フェーズ ---
-        if (this.elapsedFrames < this.expansionTime) {
-            // 1. 展開フェーズ: 直進のみ
-            // 速度は一定（低速）
-        } else {
-            // 2. 追尾・加速フェーズ
-            // 徐々に加速
-            if (this.currentSpeed < this.maxSpeed) {
-                this.currentSpeed += 0.2 * delta
-                if (this.currentSpeed > this.maxSpeed) this.currentSpeed = this.maxSpeed
-            }
-
-            // 自機への方向を計算（ループ考慮）
-            let dx = this.player.position.x - this.position.x
-            let dy = this.player.position.y - this.position.y
-
-            if (dx > WORLD_HALF) dx -= WORLD_SIZE
-            if (dx < -WORLD_HALF) dx += WORLD_SIZE
-            if (dy > WORLD_HALF) dy -= WORLD_SIZE
-            if (dy < -WORLD_HALF) dy += WORLD_SIZE
-
-            const targetAngle = Math.atan2(dx, -dy)
-
-            // 角度差を計算
-            let angleDiff = targetAngle - this.rotation
-            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
-            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2
-
-            // 徐々に回転（旋回性能も徐々に上げる演出も可能だが、ここでは固定）
-            if (Math.abs(angleDiff) < this.turnSpeed * delta) {
-                this.rotation = targetAngle
-            } else {
-                this.rotation += Math.sign(angleDiff) * this.turnSpeed * delta
-            }
-        }
-
-        // 速度ベクトル更新
-        this.velocity.x = Math.sin(this.rotation) * this.currentSpeed
-        this.velocity.y = -Math.cos(this.rotation) * this.currentSpeed
-
-        this.updatePosition(delta)
-        this.trail.update(this.position.x, this.position.y, this.rotation)
-
-        // --- 距離・寿命チェック ---
-        // dx, dy はプレイヤーとの距離計算のために再計算が必要
-        // 誘導ロジック内の dx, dy はループ考慮後の相対位置であり、
-        // 距離計算には絶対的な差分が必要なため、再計算する
-        const dx = this.player.position.x - this.position.x
-        const dy = this.player.position.y - this.position.y
-        const distDx = this.position.x - this.origin.x
-        const distDy = this.position.y - this.origin.y
-
-        const distSq = distDx * distDx + distDy * distDy
-        const playerDistSq = dx * dx + dy * dy
-
-        if (distSq > this.maxDistance * this.maxDistance) {
-            this.isAlive = false
-            this.shouldExplode = true
-            this.isMaxDistanceExplosion = true
-        }
-
-        if (playerDistSq < 40 * 40) {
-            this.isAlive = false
-            this.shouldExplode = true
-        }
-    }
-
-    public shouldExplode: boolean = false
-    /** 最大飛距離到達による爆発かどうか */
-    public isMaxDistanceExplosion: boolean = false
+  }
 }

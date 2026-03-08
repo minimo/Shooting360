@@ -1,54 +1,50 @@
-import { Graphics } from 'pixi.js'
+import * as THREE from 'three'
 import { GameObject } from './GameObject'
 
 /**
  * パーティクルクラス
- * 
+ *
  * 散らばる火花などの小さな演出用。
  */
 export class Particle extends GameObject {
-    private life: number
-    private maxLife: number
+  private life: number
+  private maxLife: number
+  private mat: THREE.MeshBasicMaterial
 
-    constructor(
-        x: number,
-        y: number,
-        vx: number,
-        vy: number,
-        life: number = 20,
-        color: number = 0xffaa00,
-        size: number = 2
-    ) {
-        super(x, y)
-        this.velocity.x = vx
-        this.velocity.y = vy
-        this.life = life
-        this.maxLife = life
-        this.createGraphics(color, size)
+  constructor(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    life: number = 20,
+    color: number = 0xffaa00,
+    size: number = 2,
+  ) {
+    super(x, y)
+    this.velocity.x = vx
+    this.velocity.y = vy
+    this.life = life
+    this.maxLife = life
+    this.mesh.position.z = 3
+
+    this.mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 })
+    const geo = new THREE.PlaneGeometry(size, size)
+    const mesh = new THREE.Mesh(geo, this.mat)
+    this.mesh.add(mesh)
+  }
+
+  public override update(delta: number, ..._args: any[]): void {
+    this.life -= delta
+    if (this.life <= 0) {
+      this.isAlive = false
+      return
     }
 
-    private createGraphics(color: number, size: number): void {
-        const g = new Graphics()
-        g.rect(-size / 2, -size / 2, size, size)
-        g.fill({ color, alpha: 1 })
-        this.display.addChild(g)
-    }
+    this.mat.opacity = this.life / this.maxLife
 
-    public override update(delta: number, ..._args: any[]): void {
-        this.life -= delta
-        if (this.life <= 0) {
-            this.isAlive = false
-            return
-        }
+    this.velocity.x *= 0.92
+    this.velocity.y *= 0.92
 
-        // フェードアウト
-        this.display.alpha = this.life / this.maxLife
-
-        // 速度の減衰（少し強めに）
-        this.velocity.x *= 0.92
-        this.velocity.y *= 0.92
-
-        // 移動
-        this.updatePosition(delta)
-    }
+    this.updatePosition(delta)
+  }
 }

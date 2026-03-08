@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js'
+import * as THREE from 'three'
 
 /**
  * ワールド設定
@@ -7,10 +7,32 @@ export const WORLD_SIZE = 4000
 export const WORLD_HALF = WORLD_SIZE / 2
 
 /**
+ * Three.js メッシュのリソースを再帰的に解放してシーンから削除するユーティリティ
+ */
+export function disposeMesh(obj: THREE.Object3D): void {
+  obj.traverse((child) => {
+    if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+      child.geometry.dispose()
+      if (Array.isArray(child.material)) {
+        child.material.forEach((m: THREE.Material) => m.dispose())
+      } else {
+        ;(child.material as THREE.Material).dispose()
+      }
+    }
+  })
+  if (obj.parent) obj.parent.remove(obj)
+}
+
+/**
  * 全ゲームオブジェクトの抽象基底クラス
  *
- * ワールド座標・速度・回転・表示オブジェクト・生存フラグを共通管理し、
+ * ワールド座標・速度・回転・メッシュ・生存フラグを共通管理し、
  * update / updateDisplay / destroy の標準インターフェースを提供する。
+ *
+ * 座標系:
+ *  - ゲームロジック: x=右, y=下 (canvas 座標)
+ *  - Three.js 表示: x=右, y=上 → mesh.position.set(dx, -dy, z) でマッピング
+ *  - 回転: ゲームは時計回り正, Three.js は反時計回り正 → mesh.rotation.z = -rotation
  */
 export abstract class GameObject {
   /** ワールド座標 */
@@ -19,11 +41,11 @@ export abstract class GameObject {
   /** 速度ベクトル */
   public velocity: { x: number; y: number }
 
-  /** 回転（ラジアン） */
+  /** 回転（ラジアン、時計回り正） */
   public rotation: number
 
-  /** PixiJS 表示オブジェクト */
-  public display: Container
+  /** Three.js 表示オブジェクト */
+  public mesh: THREE.Object3D
 
   /** 衝突判定用の半径 */
   public radius: number = 0
@@ -38,7 +60,7 @@ export abstract class GameObject {
     this.position = { x, y }
     this.velocity = { x: 0, y: 0 }
     this.rotation = 0
-    this.display = new Container()
+    this.mesh = new THREE.Group()
     this.isAlive = true
   }
 
@@ -76,18 +98,16 @@ export abstract class GameObject {
     if (dy > WORLD_HALF) dy -= WORLD_SIZE
     if (dy < -WORLD_HALF) dy += WORLD_SIZE
 
-    this.display.x = dx
-    this.display.y = dy
-    this.display.rotation = this.rotation
+    // Three.js は y-up なので Y を反転、回転も反転（CCW↔CW）
+    this.mesh.position.set(dx, -dy, this.mesh.position.z)
+    this.mesh.rotation.z = -this.rotation
   }
 
   /**
-   * 表示オブジェクトを破棄しリソースを解放
+   * メッシュを破棄しリソースを解放
    */
   public destroy(): void {
     this.isAlive = false
-    if (this.display) {
-      this.display.destroy({ children: true })
-    }
+    disposeMesh(this.mesh)
   }
 }
