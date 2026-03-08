@@ -10,7 +10,7 @@ import type { Player, SpawnBulletFn } from '../Player'
  */
 export class Fighter extends GameObject {
   protected shipBody: THREE.Mesh | undefined
-  public speed: number = 14
+  public speed: number = 7
   public rotationSpeed: number = 0.08
   public fireInterval: number = 60
   protected fireCooldown: number = 0

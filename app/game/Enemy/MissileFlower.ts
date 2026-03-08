@@ -21,6 +21,7 @@ export class MissileFlower extends GameObject {
   public hp: number = 10
   private player: Player
   private spawnHomingMissile: SpawnHomingMissileFn
+  private wave: number
   private cubeBody: THREE.Mesh | undefined
   private randomRotationSpeed: { x: number; y: number; z: number }
 
@@ -36,6 +37,7 @@ export class MissileFlower extends GameObject {
     this.radius = 27
     this.player = player
     this.spawnHomingMissile = spawnHomingMissile
+    this.wave = wave
     this.fireInterval = Math.max(60, 300 - (wave - 1) * 20)
     this.mesh.position.z = 1
 
@@ -123,8 +125,10 @@ export class MissileFlower extends GameObject {
   }
 
   private shoot8Waves(): void {
-    for (let i = 0; i < 8; i++) {
-      const angle = ((Math.PI * 2) / 8) * i
+    // Wave に応じた発射数の計算 (Wave 3 で 1発から開始)
+    const count = Math.min(8, Math.floor(this.wave / 2))
+    for (let i = 0; i < count; i++) {
+      const angle = ((Math.PI * 2) / count) * i
       this.spawnHomingMissile(this.position.x, this.position.y, angle)
     }
   }
