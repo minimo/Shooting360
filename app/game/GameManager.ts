@@ -33,7 +33,7 @@ export interface PowerUp {
  */
 export class GameManager {
   private scene: THREE.Scene | null = null
-  public player: Player = new Player(0, 0, () => {}, () => {})
+  public player: Player = new Player(0, 0, () => { }, () => { })
   private laser: Laser = new Laser(0, 0)
   private objects: GameObject[] = []
   private screenWidth: number = 0
@@ -371,7 +371,7 @@ export class GameManager {
           'メインレーザー発射中、敵を追尾するレーザーを自動で発射します',
         rarity: 3,
         maxLevel: 5,
-        effect: (_gm) => {},
+        effect: (_gm) => { },
       },
     ]
   }
@@ -723,7 +723,7 @@ export class GameManager {
       this.player.position.y,
       this.player.rotation,
     )
-    this.laser.thickness = 4 * this.player.laserWidthMultiplier
+    this.laser.thickness = 3 * this.player.laserWidthMultiplier
     this.laser.setTrigger(laserTrigger)
 
     if ((this.powerUpLevels['homing_laser'] || 0) > 0) {

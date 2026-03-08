@@ -24,35 +24,66 @@ export class Laser extends GameObject {
   private chargeDuration: number = 15
   private chargeTimer: number = 0
 
-  private afterimageCount: number = 5
+  private afterimageCount: number = 12
   private rotationHistory: number[] = []
 
   public thickness: number = 3
 
   // 残像メッシュ群
-  private afterimageMeshes: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = []
+  private afterimageMeshes: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>[] = []
   private afterimageGroups: THREE.Group[] = []
 
   // メインビーム
   private coreMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
-  private glowMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
+  private glowMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
 
   // チャージ演出
   private chargeMesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>
   private chargeGlowMesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>
+
+  // シェーダー定義
+  private static readonly vertexShader = `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `
+
+  private static readonly fragmentShader = `
+    uniform vec3 color;
+    uniform float opacity;
+    varying vec2 vUv;
+    void main() {
+      // 左右（u=0, u=1）に向かって透明になるグラデーション
+      float dist = abs(vUv.x - 0.5) * 2.0;
+      float alpha = (1.0 - pow(dist, 2.0)) * opacity;
+      gl_FragColor = vec4(color, alpha);
+    }
+  `
 
   constructor(x: number, y: number, color: number = 0x00ffff) {
     super(x, y)
     this.color = color
     this.mesh.position.z = 4
 
-    // 残像グループ（ビームの回転履歴を表示）
+    // 残像グループ（ビームの回転履歴を表示・青系に固定）
+    const afterimageColor = new THREE.Color(0x0088ff)
     for (let i = 0; i < this.afterimageCount; i++) {
       const group = new THREE.Group()
-      const geo = new THREE.PlaneGeometry(12, this.maxLength)
-      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 })
+      const geo = new THREE.PlaneGeometry(16, this.maxLength)
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          color: { value: afterimageColor },
+          opacity: { value: 0 },
+        },
+        vertexShader: Laser.vertexShader,
+        fragmentShader: Laser.fragmentShader,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
       const mesh = new THREE.Mesh(geo, mat)
-      // ビームは origin から上方向に延びる: center at y = maxLength/2
       mesh.position.set(0, this.maxLength / 2, 0)
       group.add(mesh)
       this.afterimageMeshes.push(mesh)
@@ -60,16 +91,26 @@ export class Laser extends GameObject {
       this.mesh.add(group)
     }
 
-    // グロウ（外側光）
+    // グロウ（外側光 - シェーダーでグラデーション）
     const glowGeo = new THREE.PlaneGeometry(1, this.maxLength)
     this.glowMesh = new THREE.Mesh(
       glowGeo,
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 }),
+      new THREE.ShaderMaterial({
+        uniforms: {
+          color: { value: new THREE.Color(color) },
+          opacity: { value: 0 },
+        },
+        vertexShader: Laser.vertexShader,
+        fragmentShader: Laser.fragmentShader,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
     )
     this.glowMesh.position.set(0, this.maxLength / 2, 0.1)
     this.mesh.add(this.glowMesh)
 
-    // コア（白い芯）
+    // コア（白い芯 - そのまま）
     const coreGeo = new THREE.PlaneGeometry(1, this.maxLength)
     this.coreMesh = new THREE.Mesh(
       coreGeo,
@@ -101,10 +142,16 @@ export class Laser extends GameObject {
   private updateVisuals(): void {
     if (this.state === LaserState.IDLE) {
       this.coreMesh.material.opacity = 0
-      this.glowMesh.material.opacity = 0
+      if (this.glowMesh.material.uniforms.opacity) {
+        this.glowMesh.material.uniforms.opacity.value = 0
+      }
       this.chargeMesh.material.opacity = 0
       this.chargeGlowMesh.material.opacity = 0
-      for (const m of this.afterimageMeshes) m.material.opacity = 0
+      for (const m of this.afterimageMeshes) {
+        if (m.material.uniforms.opacity) {
+          m.material.uniforms.opacity.value = 0
+        }
+      }
       return
     }
 
@@ -119,8 +166,14 @@ export class Laser extends GameObject {
       this.chargeGlowMesh.material.opacity = 0.3 * this.chargeProgress
 
       this.coreMesh.material.opacity = 0
-      this.glowMesh.material.opacity = 0
-      for (const m of this.afterimageMeshes) m.material.opacity = 0
+      if (this.glowMesh.material.uniforms.opacity) {
+        this.glowMesh.material.uniforms.opacity.value = 0
+      }
+      for (const m of this.afterimageMeshes) {
+        if (m.material.uniforms.opacity) {
+          m.material.uniforms.opacity.value = 0
+        }
+      }
       return
     }
 
@@ -136,37 +189,39 @@ export class Laser extends GameObject {
         if (rot === undefined || !group || !mesh) continue
 
         const relRot = rot - this.rotation
-        // 親グループ rotation.z = -this.rotation に対して
-        // 残像グループに -relRot を適用すると最終的に -rot になる（= Three.js での絶対回転）
         group.rotation.z = -relRot
 
-        const alpha = (1 - i / this.afterimageCount) * 0.15
-        mesh.material.opacity = alpha
+        const alpha = (1 - i / this.afterimageCount) * 0.2
+        if (mesh.material.uniforms.opacity) {
+          mesh.material.uniforms.opacity.value = alpha
+        }
 
-        // 残像のビーム幅は固定 12px
-        if (mesh.geometry.parameters.width !== 12) {
+        // 残像のビーム幅（少し太めにしてグラデーションを活かす）
+        if (mesh.geometry.parameters.width !== 16) {
           mesh.geometry.dispose()
-          mesh.geometry = new THREE.PlaneGeometry(12, this.maxLength)
+          mesh.geometry = new THREE.PlaneGeometry(16, this.maxLength)
           mesh.position.set(0, this.maxLength / 2, 0)
         }
       }
 
       // メインビーム - thickness に応じてサイズ更新
-      const halfW = this.thickness * 2
-      const coreW = this.thickness * 0.75
+      const glowW = this.thickness * 2.5 // グラデーションの余白を含めて少し広めに
+      const coreW = this.thickness * 0.5 // 芯は細く
 
-      if (Math.abs(this.glowMesh.geometry.parameters.width - halfW * 2) > 0.5) {
+      if (Math.abs(this.glowMesh.geometry.parameters.width - glowW) > 0.1) {
         this.glowMesh.geometry.dispose()
-        this.glowMesh.geometry = new THREE.PlaneGeometry(halfW * 2, this.maxLength)
+        this.glowMesh.geometry = new THREE.PlaneGeometry(glowW, this.maxLength)
         this.glowMesh.position.set(0, this.maxLength / 2, 0.1)
       }
-      if (Math.abs(this.coreMesh.geometry.parameters.width - coreW * 2) > 0.5) {
+      if (Math.abs(this.coreMesh.geometry.parameters.width - coreW) > 0.1) {
         this.coreMesh.geometry.dispose()
-        this.coreMesh.geometry = new THREE.PlaneGeometry(coreW * 2, this.maxLength)
+        this.coreMesh.geometry = new THREE.PlaneGeometry(coreW, this.maxLength)
         this.coreMesh.position.set(0, this.maxLength / 2, 0.2)
       }
 
-      this.glowMesh.material.opacity = 0.4
+      if (this.glowMesh.material.uniforms.opacity) {
+        this.glowMesh.material.uniforms.opacity.value = 0.6
+      }
       this.coreMesh.material.opacity = 1.0
     }
   }
