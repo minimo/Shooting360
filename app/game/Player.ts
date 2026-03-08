@@ -18,6 +18,9 @@ export type SpawnAfterimageFn = (
   alpha?: number,
 ) => void
 
+/** 自機誘導弾生成コールバック型 */
+export type SpawnPlayerHomingMissileFn = (x: number, y: number) => boolean
+
 /**
  * 自機クラス
  */
@@ -62,11 +65,15 @@ export class Player extends GameObject {
   public screenWidth: number = 0
   public screenHeight: number = 0
 
+  public homingCooldown: number = 0
+  public currentWave: number = 1
+
   public override radius: number = 12
   public override side: 'player' | 'enemy' = 'player'
 
   private spawnBullet: SpawnBulletFn
   private spawnAfterimage: SpawnAfterimageFn
+  private spawnHomingMissile: SpawnPlayerHomingMissileFn
   private trail: TrailEffect
 
   constructor(
@@ -74,10 +81,12 @@ export class Player extends GameObject {
     y: number,
     spawnBullet: SpawnBulletFn,
     spawnAfterimage: SpawnAfterimageFn,
+    spawnHomingMissile: SpawnPlayerHomingMissileFn,
   ) {
     super(x, y)
     this.spawnBullet = spawnBullet
     this.spawnAfterimage = spawnAfterimage
+    this.spawnHomingMissile = spawnHomingMissile
     this.mesh.position.z = 2
 
     this.powerGauge = new Gauge({
@@ -231,6 +240,13 @@ export class Player extends GameObject {
     }
 
     this.updatePosition(delta)
+
+    if (this.homingCooldown > 0) {
+      this.homingCooldown -= delta
+    } else {
+      // 周囲に敵がいるかどうかの判定は GameManager 側で行われる
+      this.spawnHomingMissile(this.position.x, this.position.y)
+    }
 
     this.fireCooldown -= delta
     if (input.shoot && this.fireCooldown <= 0) {

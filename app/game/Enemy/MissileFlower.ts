@@ -21,6 +21,8 @@ export class MissileFlower extends GameObject {
   public hp: number = 10
   private player: Player
   private spawnHomingMissile: SpawnHomingMissileFn
+  private cubeBody: THREE.Mesh | undefined
+  private randomRotationSpeed: { x: number; y: number; z: number }
 
   constructor(
     x: number,
@@ -40,12 +42,25 @@ export class MissileFlower extends GameObject {
     this.lookAtPlayer()
     this.createMesh()
     this.fireCooldown = this.fireInterval
+
+    // ランダムな回転速度を設定 (-0.05 ~ 0.05)
+    this.randomRotationSpeed = {
+      x: (Math.random() - 0.5) * 0.1,
+      y: (Math.random() - 0.5) * 0.1,
+      z: (Math.random() - 0.5) * 0.1,
+    }
   }
 
   private createMesh(): void {
-    const geo = new THREE.PlaneGeometry(36, 36)
-    const mat = new THREE.MeshBasicMaterial({ color: 0x3333ff })
-    this.mesh.add(new THREE.Mesh(geo, mat))
+    const geo = new THREE.BoxGeometry(32, 32, 32)
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x3333ff,
+      flatShading: true,
+      emissive: 0x3333ff,
+      emissiveIntensity: 0.5,
+    })
+    this.cubeBody = new THREE.Mesh(geo, mat)
+    this.mesh.add(this.cubeBody)
   }
 
   private lookAtPlayer(): void {
@@ -90,6 +105,13 @@ export class MissileFlower extends GameObject {
     const targetVelY = -Math.cos(targetMoveAngle) * this.speed
     this.velocity.x += (targetVelX - this.velocity.x) * 0.03
     this.velocity.y += (targetVelY - this.velocity.y) * 0.03
+
+    // ランダム回転の適用
+    if (this.cubeBody) {
+      this.cubeBody.rotation.x += this.randomRotationSpeed.x * delta
+      this.cubeBody.rotation.y += this.randomRotationSpeed.y * delta
+      this.cubeBody.rotation.z += this.randomRotationSpeed.z * delta
+    }
 
     this.updatePosition(delta)
 

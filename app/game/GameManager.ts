@@ -33,7 +33,7 @@ export interface PowerUp {
  */
 export class GameManager {
   private scene: THREE.Scene | null = null
-  public player: Player = new Player(0, 0, () => { }, () => { })
+  public player: Player = new Player(0, 0, () => { }, () => { }, () => false)
   private laser: Laser = new Laser(0, 0)
   private objects: GameObject[] = []
   private screenWidth: number = 0
@@ -164,7 +164,13 @@ export class GameManager {
     this.addObject(this.laser)
 
     // 自機
-    this.player = new Player(0, 0, spawnBullet, this.spawnAfterimage.bind(this))
+    this.player = new Player(
+      0,
+      0,
+      spawnBullet,
+      this.spawnAfterimage.bind(this),
+      this.spawnPlayerHomingMissile.bind(this),
+    )
     this.player.screenWidth = screenWidth
     this.player.screenHeight = screenHeight
     scene.add(this.player.mesh)
@@ -412,8 +418,56 @@ export class GameManager {
       angle,
       this.player,
       this.spawnAfterimage.bind(this),
+      'enemy',
     )
     this.addObject(missile)
+  }
+
+  private spawnPlayerHomingMissile(x: number, y: number): boolean {
+    // 最も近い敵を探す
+    let nearestEnemy: GameObject | null = null
+    let minDist = 300 // 射程距離
+
+    for (const obj of this.objects) {
+      if (obj.isAlive && obj.side === 'enemy' && obj.radius > 0) {
+        let dx = obj.position.x - x
+        let dy = obj.position.y - y
+        if (dx > WORLD_HALF) dx -= WORLD_SIZE
+        if (dx < -WORLD_HALF) dx += WORLD_SIZE
+        if (dy > WORLD_HALF) dy -= WORLD_SIZE
+        if (dy < -WORLD_HALF) dy += WORLD_SIZE
+        const d = Math.sqrt(dx * dx + dy * dy)
+        if (d < minDist) {
+          minDist = d
+          nearestEnemy = obj
+        }
+      }
+    }
+
+    if (!nearestEnemy) return false
+
+    // Wave に応じた発射数とクールタイムの計算
+    // 数: Wave 1-2 で 2発、Wave 2ごとに +1 (最大 8)
+    const count = Math.min(8, 2 + Math.floor((this.currentWave - 1) / 2))
+    // クールタイム: 10秒から 0.2秒ずつ短縮 (最小 8秒)
+    const cooldownSec = Math.max(8, 10 - (this.currentWave - 1) * 0.2)
+    const cooldownFrames = cooldownSec * 60
+
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 / count) * i
+      const missile = new HomingMissile(
+        x,
+        y,
+        angle,
+        nearestEnemy,
+        this.spawnAfterimage.bind(this),
+        'player',
+      )
+      this.addObject(missile)
+    }
+
+    this.player.homingCooldown = cooldownFrames
+    return true
   }
 
   private nextWave(): void {
@@ -717,6 +771,7 @@ export class GameManager {
     let laserTrigger = input.laser
     if (this.player.laserPower <= 0 || this.player.isLaserOverheated) laserTrigger = false
 
+    this.player.currentWave = this.currentWave
     this.player.update(delta, input)
     this.laser.updateFromPlayer(
       this.player.position.x,
