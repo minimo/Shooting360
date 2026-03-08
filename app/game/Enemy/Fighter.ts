@@ -31,7 +31,7 @@ export class Fighter extends GameObject {
   ) {
     super(x, y)
     this.side = 'enemy'
-    this.radius = 10
+    this.radius = 15
     this.player = player
     this.spawnBullet = spawnBullet
     this.fireInterval = Math.max(30, 120 - (wave - 1) * 10)
@@ -52,16 +52,16 @@ export class Fighter extends GameObject {
 
     const vertices = new Float32Array([
       // 上面
-      0, 10, 0, 9, -7, 3, -9, -7, 3,
+      0, 15, 0, 13.5, -10.5, 4.5, -13.5, -10.5, 4.5,
       // 下面
-      0, 10, 0, -9, -7, -3, 9, -7, -3,
+      0, 15, 0, -13.5, -10.5, -4.5, 13.5, -10.5, -4.5,
       // 右側面
-      0, 10, 0, 9, -7, -3, 9, -7, 3,
+      0, 15, 0, 13.5, -10.5, -4.5, 13.5, -10.5, 4.5,
       // 左側面
-      0, 10, 0, -9, -7, 3, -9, -7, -3,
+      0, 15, 0, -13.5, -10.5, 4.5, -13.5, -10.5, -4.5,
       // 背面
-      9, -7, 3, 9, -7, -3, -9, -7, -3,
-      9, -7, 3, -9, -7, -3, -9, -7, 3,
+      13.5, -10.5, 4.5, 13.5, -10.5, -4.5, -13.5, -10.5, -4.5,
+      13.5, -10.5, 4.5, -13.5, -10.5, -4.5, -13.5, -10.5, 4.5,
     ])
 
     geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
