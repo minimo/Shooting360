@@ -12,6 +12,7 @@ import { HomingMissile } from './HomingMissile'
 import { HomingExplosion } from './HomingExplosion'
 import { GameObject, WORLD_SIZE, WORLD_HALF } from './GameObject'
 import { Afterimage } from './Afterimage'
+import { HomingLaser } from './HomingLaser'
 import type { InputState } from '~/composables/useInput'
 import { Gauge } from './Gauge'
 import { Laser, LaserState } from './Laser'
@@ -82,6 +83,10 @@ export class GameManager {
     // スポーンタイマー
     private enemySpawnTimer: number = 0
     private enemySpawnInterval: number = 120 // フレーム単位
+
+    // ホーミングレーザー用
+    private homingLaserTimer: number = 0
+    private homingLaserInterval: number = 20 // 0.33秒間隔
 
     /** ゲームがアクティブ（開始済み）かどうか */
     public isGameActive: boolean = false
@@ -250,6 +255,7 @@ export class GameManager {
             { id: 'piercing', name: '貫通弾', description: '弾丸が敵を貫通し、後方の敵にもダメージを与えます', rarity: 3, maxLevel: 1, effect: (gm) => { gm.resetExclusiveShotGroup('piercing'); gm.player.bulletPiercing = true } },
             { id: 'damage_reduction', name: 'ダメージ軽減', description: '受けるダメージを10%カットします', rarity: 2, maxLevel: 5, effect: (gm) => { gm.player.damageReductionMultiplier *= 0.9 } },
             { id: 'speed_up', name: '最高速度アップ', description: '自機の最高速度が15%アップします', rarity: 1, maxLevel: 5, effect: (gm) => { gm.player.maxSpeed *= 1.15 } },
+            { id: 'homing_laser', name: 'ホーミングレーザー', description: 'メインレーザー発射中、敵を追尾するレーザーを自動で発射します', rarity: 3, maxLevel: 5, effect: (gm) => { /* レベル管理のみ */ } },
         ]
     }
 
@@ -704,6 +710,18 @@ export class GameManager {
         this.laser.thickness = 4 * this.player.laserWidthMultiplier
         this.laser.setTrigger(laserTrigger)
 
+        // ホーミングレーザー取得時は通常レーザーを非表示にする
+        // また、溜め（CHARGING）を無視して即座に発射状態（FIRING）にする
+        if ((this.powerUpLevels['homing_laser'] || 0) > 0) {
+            this.laser.display.visible = false
+            if (laserTrigger) {
+                this.laser.state = LaserState.FIRING
+            }
+        }
+
+        // ホーミングレーザーの更新
+        this.updateHomingLaser(delta)
+
         // --- レーザー演出（パーティクル） ---
         if (this.laser.state === LaserState.CHARGING || this.laser.state === LaserState.FIRING) {
             // 自機の先端（中心から前方に20px程度）
@@ -953,7 +971,8 @@ export class GameManager {
         const lasers = this.objects.filter(obj => obj instanceof Laser && obj.isAlive) as Laser[]
 
         // レーザーの当たり判定（発射中のみ判定）
-        if (this.laser.state === LaserState.FIRING) {
+        // ホーミングレーザー取得時は通常レーザーの当たり判定を無効化
+        if (this.laser.state === LaserState.FIRING && (this.powerUpLevels['homing_laser'] || 0) <= 0) {
             const start = this.player.position
             const end = this.laser.getEndPoint()
             for (const enemy of enemies) {
@@ -1117,12 +1136,10 @@ export class GameManager {
                     this.player.takeDamage(ex.damage)
                     this.shakeFrames = 20
                     this.spawnHitEffect(this.player.position.x, this.player.position.y, 0xffaa00, this.player.velocity.x, this.player.velocity.y)
-                    // プレイヤー被弾なので加点なし
                 }
             }
 
             // 敵機（Enemy, MissileFlower）との衝突
-            const enemies = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) as (Fighter | MissileFlower)[]
             for (const enemy of enemies) {
                 if (this.hitTest(ex, enemy)) {
                     if (ex.canDealDamage(enemy)) {
@@ -1132,10 +1149,12 @@ export class GameManager {
                         // 誘爆による撃破加点
                         if (!enemy.isAlive) {
                             this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
-                            if (enemy instanceof MissileFlower) {
-                                this.addScore(200)
+                            if (enemy instanceof AceFighter) {
+                                this.addScore(2000)
+                            } else if (enemy instanceof MissileFlower) {
+                                this.addScore(1000)
                             } else {
-                                this.addScore(100)
+                                this.addScore(300)
                             }
                         }
                     }
@@ -1152,6 +1171,30 @@ export class GameManager {
                         }
                         this.spawnHitEffect(missile.position.x, missile.position.y, 0xffaa00, missile.velocity.x, missile.velocity.y)
                     }
+                }
+            }
+        }
+
+        // 3. ホーミングレーザー vs 敵機
+        const homingLasers = this.objects.filter(obj => obj instanceof HomingLaser && obj.isAlive) as HomingLaser[]
+        for (const hl of homingLasers) {
+            for (const enemy of enemies) {
+                if (this.hitTest(hl, enemy)) {
+                    enemy.takeDamage(hl.damage)
+                    this.spawnHitEffect(hl.position.x, hl.position.y, 0xffff00, hl.velocity.x, hl.velocity.y)
+                    hl.isAlive = false // ヒットしたら消滅
+
+                    if (!enemy.isAlive) {
+                        this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                        if (enemy instanceof AceFighter) {
+                            this.addScore(2000)
+                        } else if (enemy instanceof MissileFlower) {
+                            this.addScore(1000)
+                        } else {
+                            this.addScore(300)
+                        }
+                    }
+                    break // 1つのレーザーは1つの敵にのみ当たる
                 }
             }
         }
@@ -1259,6 +1302,66 @@ export class GameManager {
         const r1 = a.radius || 10
         const r2 = b.radius || 10
         return distance < r1 + r2
+    }
+
+    /**
+     * ホーミングレーザーの発射処理
+     */
+    private updateHomingLaser(delta: number): void {
+        const level = this.powerUpLevels['homing_laser'] || 0
+        if (level <= 0) return
+
+        const interval = Math.max(8, 20 - (level - 1) * 3)
+
+        // レーザー発射中のみ
+        if (this.laser.state !== LaserState.FIRING) {
+            // 次に発射した瞬間に初弾が出るように、タイマーをインターバル分で待機させる
+            this.homingLaserTimer = interval
+            return
+        }
+
+        this.homingLaserTimer += delta
+
+        if (this.homingLaserTimer >= interval) {
+            this.homingLaserTimer %= interval
+
+            // 近くの敵を検索
+            const enemies = this.objects.filter(obj => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive)
+            if (enemies.length === 0) return
+
+            // 最も近い敵を探す
+            let closestEnemy: GameObject | null = null
+            let minDistSq = Infinity
+            for (const enemy of enemies) {
+                let dx = enemy.position.x - this.player.position.x
+                let dy = enemy.position.y - this.player.position.y
+                if (dx > WORLD_HALF) dx -= WORLD_SIZE
+                if (dx < -WORLD_HALF) dx += WORLD_SIZE
+                if (dy > WORLD_HALF) dy -= WORLD_SIZE
+                if (dy < -WORLD_HALF) dy += WORLD_SIZE
+                const distSq = dx * dx + dy * dy
+                if (distSq < minDistSq) {
+                    minDistSq = distSq
+                    closestEnemy = enemy
+                }
+            }
+
+            // ホーミングレーザー生成 (4発同時発射)
+            if (closestEnemy) {
+                // 指定された角度：30度, -30度, 50度, -50度
+                const offsetDegrees = [30, -30, 50, -50]
+
+                for (const deg of offsetDegrees) {
+                    const radians = deg * (Math.PI / 180)
+                    const angle = this.player.rotation + radians
+                    const hl = new HomingLaser(this.player.position.x, this.player.position.y, angle, closestEnemy, this.spawnAfterimage.bind(this))
+
+                    // ダメージもレベルに応じて微増
+                    hl.damage = 2 + (level - 1) * 0.5
+                    this.addObject(hl)
+                }
+            }
+        }
     }
 
     /**
