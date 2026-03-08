@@ -22,6 +22,7 @@ export type SpawnAfterimageFn = (
  * 自機クラス
  */
 export class Player extends GameObject {
+  private shipBody: THREE.Mesh | undefined
   public maxHp: number = 20
   public hp: number = 20
 
@@ -106,17 +107,59 @@ export class Player extends GameObject {
   }
 
   private createMesh(): void {
-    // PixiJS: [0,-16, 12,13, 0,6, -12,13] y-down → negate Y for Three.js y-up
-    const shape = new THREE.Shape()
-    shape.moveTo(0, 16)
-    shape.lineTo(12, -13)
-    shape.lineTo(0, -6)
-    shape.lineTo(-12, -13)
-    shape.closePath()
+    const geometry = new THREE.BufferGeometry()
 
-    const geo = new THREE.ShapeGeometry(shape)
-    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide })
-    this.mesh.add(new THREE.Mesh(geo, mat))
+    // 頂点定義 (楔形: 前が薄く、後が厚い)
+    // 前端: (0, 16, 0)
+    // 右後: (12, -13, 4), (12, -13, -4)
+    // 中後: (0, -6, 4), (0, -6, -4)
+    // 左後: (-12, -13, 4), (-12, -13, -4)
+
+    // 頂点配列 [x, y, z, ...]
+    const vertices = new Float32Array([
+      // 上面 (前, 右後上, 中後上, 左後上)
+      0, 16, 0, 12, -13, 4, 0, -6, 4,
+      0, 16, 0, 0, -6, 4, -12, -13, 4,
+
+      // 下面 (前, 右後下, 中後下, 左後下)
+      0, 16, 0, 0, -6, -4, 12, -13, -4,
+      0, 16, 0, -12, -13, -4, 0, -6, -4,
+
+      // 右側面
+      0, 16, 0, 12, -13, -4, 12, -13, 4,
+      12, -13, 4, 12, -13, -4, 0, -6, -4,
+      12, -13, 4, 0, -6, -4, 0, -6, 4,
+
+      // 左側面
+      0, 16, 0, -12, -13, 4, -12, -13, -4,
+      -12, -13, 4, 0, -6, 4, 0, -6, -4,
+      -12, -13, 4, 0, -6, -4, -12, -13, -4,
+
+      // 背面 (右)
+      12, -13, 4, 12, -13, -4, 0, -6, -4,
+      12, -13, 4, 0, -6, -4, 0, -6, 4,
+
+      // 背面 (左)
+      -12, -13, 4, 0, -6, 4, 0, -6, -4,
+      -12, -13, 4, 0, -6, -4, -12, -13, -4,
+    ])
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
+    geometry.computeVertexNormals() // 法線計算（ライティング用）
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x00ffff,
+      flatShading: true,
+      side: THREE.DoubleSide,
+    })
+
+    const mesh = new THREE.Mesh(geometry, material)
+    this.shipBody = mesh
+    this.mesh.add(mesh)
+
+    // ライティングがない場合のために、自己発光を強化して鮮やかにする
+    material.emissive.setHex(0x00ffff)
+    material.emissiveIntensity = 0.5
   }
 
   public override update(delta: number, input: any): void {
@@ -291,6 +334,15 @@ export class Player extends GameObject {
    */
   public override updateDisplay(_cameraX: number, _cameraY: number): void {
     this.mesh.position.set(0, 0, 2)
+
+    // 親グループを回転させて進行方向を決める
+    // z回転により、先端 (子メッシュの y+) が常に画面上の進行方向を向く
     this.mesh.rotation.z = -this.rotation
+
+    // 子メッシュを y軸 (先端方向) を軸にロールさせる
+    // これにより、先端の向きを変えずに機体だけを傾けることができる
+    if (this.shipBody) {
+      this.shipBody.rotation.y = this.rotation
+    }
   }
 }

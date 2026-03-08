@@ -9,7 +9,7 @@ import { GameObject } from './GameObject'
 export class Afterimage extends GameObject {
   private life: number
   private maxLife: number
-  private mat: THREE.LineBasicMaterial | null = null
+  private mat: THREE.MeshBasicMaterial | null = null
 
   constructor(
     x1: number,
@@ -32,11 +32,30 @@ export class Afterimage extends GameObject {
     if (isNaN(targetX) || isNaN(targetY)) return
 
     // Three.js は y-up なので Y を反転
-    const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(targetX, -targetY, 0)]
-    const geo = new THREE.BufferGeometry().setFromPoints(points)
-    this.mat = new THREE.LineBasicMaterial({ color, opacity: alpha, transparent: true, linewidth: 4 })
-    const line = new THREE.Line(geo, this.mat)
-    this.mesh.add(line)
+    const dx = targetX
+    const dy = -targetY
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    if (distance === 0) return
+
+    const angle = Math.atan2(dy, dx)
+    const thickness = 4 // 軌跡の太さ
+
+    // 距離分の長さを持つ板を作成
+    const geo = new THREE.PlaneGeometry(distance, thickness)
+    this.mat = new THREE.MeshBasicMaterial({
+      color,
+      opacity: alpha,
+      transparent: true,
+      side: THREE.DoubleSide
+    })
+
+    const mesh = new THREE.Mesh(geo, this.mat)
+
+    // 中点に配置して回転させる
+    mesh.position.set(dx / 2, dy / 2, 0)
+    mesh.rotation.z = angle
+
+    this.mesh.add(mesh)
   }
 
   public override update(delta: number, ..._args: any[]): void {

@@ -9,6 +9,7 @@ import type { Player, SpawnBulletFn } from '../Player'
  * プレイヤーが正面から向かってきた場合は横に回避する。
  */
 export class Fighter extends GameObject {
+  protected shipBody: THREE.Mesh | undefined
   public speed: number = 14
   public rotationSpeed: number = 0.08
   public fireInterval: number = 60
@@ -42,17 +43,43 @@ export class Fighter extends GameObject {
   }
 
   protected createMesh(): void {
-    // PixiJS: [{0,-10},{-9,7},{9,7}] y-down → Three.js y-up: negate Y
-    const shape = new THREE.Shape()
-    shape.moveTo(0, 10)
-    shape.lineTo(-9, -7)
-    shape.lineTo(9, -7)
-    shape.closePath()
+    const geometry = new THREE.BufferGeometry()
 
-    const geo = new THREE.ShapeGeometry(shape)
-    const mat = new THREE.MeshBasicMaterial({ color: 0xff3333, side: THREE.DoubleSide })
-    const mesh = new THREE.Mesh(geo, mat)
+    // 頂点定義 (三角形ベースの楔形)
+    // 前端: (0, 10, 0)
+    // 右後: (9, -7, 3), (9, -7, -3)
+    // 左後: (-9, -7, 3), (-9, -7, -3)
+
+    const vertices = new Float32Array([
+      // 上面
+      0, 10, 0, 9, -7, 3, -9, -7, 3,
+      // 下面
+      0, 10, 0, -9, -7, -3, 9, -7, -3,
+      // 右側面
+      0, 10, 0, 9, -7, -3, 9, -7, 3,
+      // 左側面
+      0, 10, 0, -9, -7, 3, -9, -7, -3,
+      // 背面
+      9, -7, 3, 9, -7, -3, -9, -7, -3,
+      9, -7, 3, -9, -7, -3, -9, -7, 3,
+    ])
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
+    geometry.computeVertexNormals()
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xff3333,
+      flatShading: true,
+      side: THREE.DoubleSide,
+    })
+
+    const mesh = new THREE.Mesh(geometry, material)
+    this.shipBody = mesh
     this.mesh.add(mesh)
+
+    // 発光設定
+    material.emissive.setHex(0xff3333)
+    material.emissiveIntensity = 0.5
   }
 
   private lookAtPlayer(): void {
@@ -160,5 +187,16 @@ export class Fighter extends GameObject {
 
   protected shoot(): void {
     this.spawnBullet(this.position.x, this.position.y, this.rotation, 'enemy')
+  }
+
+  public override updateDisplay(cameraX: number, cameraY: number): void {
+    super.updateDisplay(cameraX, cameraY)
+
+    // 親の z 回転は super.updateDisplay で設定される (mesh.rotation.z = -this.rotation)
+
+    // 子メッシュを y軸 (先端方向) を軸にロールさせる
+    if (this.shipBody) {
+      this.shipBody.rotation.y = this.rotation
+    }
   }
 }
