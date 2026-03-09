@@ -487,10 +487,7 @@ export class GameManager {
 
   private clearWave(): void {
     if (this.player.isAlive) {
-      this.player.hp = Math.min(
-        this.player.maxHp,
-        this.player.hp + this.player.maxHp * 0.5,
-      )
+      this.player.hp = this.player.maxHp
       this.player.laserPower = this.player.maxLaserPower
       this.player.isLaserOverheated = false
     }
@@ -635,6 +632,7 @@ export class GameManager {
     let leveledUp = false
     while (this.score >= this.scoreForNextPowerUp) {
       this.playerLevel++
+      this.player.hp = this.player.maxHp // レベルアップ時に体力全回復
       this.pendingPowerUpSelections++
       this.powerUpReason = 'level'
       this.currentPowerUpInterval += 500
