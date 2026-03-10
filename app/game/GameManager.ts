@@ -749,7 +749,14 @@ export class GameManager {
       }
     }
 
-    if (!this.isGameActive) return
+    if (!this.isGameActive) {
+      this.player.mesh.visible = false
+      this.laser.mesh.visible = false
+      return
+    }
+
+    this.player.mesh.visible = true
+    this.laser.mesh.visible = true
 
     // 画面シェイク
     if (this.shakeFrames > 0) {
