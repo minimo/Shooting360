@@ -37,8 +37,11 @@
     <!-- タイトル画面 -->
     <div v-if="showOverlay" class="overlay">
       <div class="overlay-content">
-        <h2>🎮 Shooting 360</h2>
-        <p>Z / X キーでスタート</p>
+        <div class="title-container">
+          <h1 class="glitch-title" data-text="SHOOTING 360">SHOOTING 360</h1>
+          <div class="subtitle">OMNIDIRECTIONAL 2D SHOOTING</div>
+        </div>
+        <p class="start-hint">PRESS Z / X TO START</p>
         <div class="controls">
           <ul>
             <li>⬅️➡️: 回転</li>
@@ -701,41 +704,119 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.75);
+  background: radial-gradient(circle at center, rgba(10, 10, 30, 0.85) 0%, rgba(0, 0, 0, 0.95) 100%);
   z-index: 10;
+  backdrop-filter: blur(8px);
 }
 
 .overlay-content {
   text-align: center;
   color: #fff;
-  font-family: 'Segoe UI', sans-serif;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.1rem;
 }
 
-.overlay-content h2 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  color: #00ffcc;
-  text-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+/* タイトルアニメーション */
+.title-container {
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.glitch-title {
+  font-size: 5rem !important;
+  font-weight: 700;
+  color: #00f2ff !important;
+  text-shadow: 
+    0 0 10px rgba(0, 242, 255, 0.8),
+    0 0 20px rgba(0, 242, 255, 0.5),
+    0 0 40px rgba(0, 242, 255, 0.3);
+  margin-bottom: 0.5rem !important;
+  position: relative;
+  letter-spacing: 0.4rem;
+  text-transform: uppercase;
+}
+
+.glitch-title::before,
+.glitch-title::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+}
+
+.glitch-title::before {
+  color: #ff00ff;
+  z-index: -1;
+  animation: glitch-anim 3s infinite linear alternate-reverse;
+}
+
+.glitch-title::after {
+  color: #00ffff;
+  z-index: -2;
+  animation: glitch-anim-2 2s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes glitch-anim-2 {
+  0% { transform: translate(0); }
+  20% { transform: translate(2px, -2px); }
+  40% { transform: translate(2px, 2px); }
+  60% { transform: translate(-2px, -2px); }
+  80% { transform: translate(-2px, 2px); }
+  100% { transform: translate(0); }
+}
+
+.subtitle {
+  font-size: 1.2rem;
+  color: #66ccff;
+  opacity: 0.8;
+  letter-spacing: 0.8rem;
+  margin-top: -0.5rem;
+  text-shadow: 0 0 10px rgba(102, 204, 255, 0.5);
+}
+
+.start-hint {
+  font-size: 1.4rem !important;
+  color: #fff !important;
+  margin: 2rem 0 !important;
+  animation: pulse 2s infinite ease-in-out;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
 .game-over-text {
-  font-size: 3.5rem !important;
+  font-size: 4.5rem !important;
   color: #ff3333 !important;
-  text-shadow: 0 0 20px rgba(255, 51, 51, 0.5) !important;
-}
-
-.overlay-content p {
-  font-size: 1.2rem;
-  color: #aaa;
-  margin: 0.3rem 0;
+  text-shadow: 
+    0 0 15px rgba(255, 51, 51, 0.8),
+    0 0 30px rgba(255, 51, 51, 0.4);
+  font-weight: 700;
+  margin-bottom: 1rem !important;
+  letter-spacing: 0.5rem;
 }
 
 .controls {
-  margin-top: 1.5rem;
-  padding: 1rem 2rem;
-  background: rgba(255, 255, 255, 0.05);
+  margin-top: 3rem;
+  padding: 2rem 3rem;
+  background: rgba(0, 242, 255, 0.05);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 242, 255, 0.2);
+  box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.1);
 }
 
 .controls ul {
@@ -745,9 +826,12 @@ onUnmounted(() => {
 
 .controls li {
   text-align: left;
-  font-size: 1.1rem;
-  color: #ccc;
-  margin: 0.4rem 0;
+  font-size: 1rem;
+  color: #aaddff;
+  margin: 0.6rem 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 /* パワーアップUI */
