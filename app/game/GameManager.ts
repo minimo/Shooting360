@@ -15,6 +15,8 @@ import { Afterimage } from './Afterimage'
 import { HomingLaser } from './HomingLaser'
 import type { InputState } from '~/composables/useInput'
 import { Laser, LaserState } from './Laser'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
 
 export interface PowerUp {
   id: string
@@ -39,6 +41,8 @@ export class GameManager {
   private screenWidth: number = 0
   private screenHeight: number = 0
   private minimap: Minimap = new Minimap()
+  private sharedBaseModel: THREE.Object3D | null = null
+  private enemyBaseModel: THREE.Object3D | null = null
 
   // 画面シェイク
   private shakeFrames: number = 0
@@ -106,7 +110,7 @@ export class GameManager {
   /**
    * 初期化
    */
-  public init(scene: THREE.Scene, screenWidth: number, screenHeight: number): void {
+  public async init(scene: THREE.Scene, screenWidth: number, screenHeight: number): Promise<void> {
     this.scene = scene
     this.screenWidth = screenWidth
     this.screenHeight = screenHeight
@@ -163,6 +167,22 @@ export class GameManager {
     this.laser = new Laser(0, 0)
     this.addObject(this.laser)
 
+    // モデルの読み込み
+    const loader = new GLTFLoader()
+    const gltf = await loader.loadAsync('/models/fighter.glb').catch((e: Error) => {
+      console.error('Failed to load fighter model:', e)
+      return null
+    })
+    const playerModel = gltf ? gltf.scene : undefined
+    this.sharedBaseModel = playerModel || null
+
+    // 敵機用モデルの読み込み
+    const enemyGltf = await loader.loadAsync('/models/Enemy.glb').catch((e: Error) => {
+      console.error('Failed to load enemy model:', e)
+      return null
+    })
+    this.enemyBaseModel = enemyGltf ? enemyGltf.scene : null
+
     // 自機
     this.player = new Player(
       0,
@@ -170,6 +190,7 @@ export class GameManager {
       spawnBullet,
       this.spawnAfterimage.bind(this),
       this.spawnPlayerHomingMissile.bind(this),
+      playerModel,
     )
     this.player.screenWidth = screenWidth
     this.player.screenHeight = screenHeight
@@ -749,14 +770,10 @@ export class GameManager {
       }
     }
 
-    if (!this.isGameActive) {
-      this.player.mesh.visible = false
-      this.laser.mesh.visible = false
-      return
+    if (this.player.isAlive) {
+      this.player.mesh.visible = this.isGameActive
+      this.laser.mesh.visible = this.isGameActive
     }
-
-    this.player.mesh.visible = true
-    this.laser.mesh.visible = true
 
     // 画面シェイク
     if (this.shakeFrames > 0) {
@@ -952,13 +969,6 @@ export class GameManager {
     }
   }
 
-  public destroy(): void {
-    for (const obj of this.objects) obj.destroy()
-    this.objects = []
-    if (this.player) this.player.destroy()
-    if (this.laser) this.laser.destroy()
-    this.scene = null
-  }
 
   private spawnEnemy(): void {
     if (!this.scene) return
@@ -974,6 +984,7 @@ export class GameManager {
 
     const rand = Math.random()
     if (rand < aceRate) {
+      const model = this.sharedBaseModel ? SkeletonUtils.clone(this.sharedBaseModel) : undefined
       this.addObject(
         new AceFighter(
           x,
@@ -983,6 +994,7 @@ export class GameManager {
           (obj) => this.addObject(obj),
           this.spawnAfterimage.bind(this),
           this.currentWave,
+          model,
         ),
       )
     } else if (rand < aceRate + sniperRate) {
@@ -996,6 +1008,7 @@ export class GameManager {
         ),
       )
     } else {
+      const model = this.enemyBaseModel ? SkeletonUtils.clone(this.enemyBaseModel) : undefined
       this.addObject(
         new Fighter(
           x,
@@ -1003,6 +1016,7 @@ export class GameManager {
           this.player,
           (ex, ey, ea) => this.spawnBullet(ex, ey, ea, 'enemy'),
           this.currentWave,
+          model,
         ),
       )
     }
@@ -1437,6 +1451,16 @@ export class GameManager {
         }
       }
     }
+  }
+
+  public destroy(): void {
+    if (this.scene) {
+      while (this.scene.children.length > 0) {
+        this.scene.remove(this.scene.children[0]!)
+      }
+    }
+    this.objects.forEach((obj) => obj.destroy())
+    this.objects = []
   }
 
   private cleanup(): void {

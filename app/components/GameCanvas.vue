@@ -360,7 +360,7 @@ const startOnKey = (e: KeyboardEvent) => {
   }
 }
 
-const restartOnKey = () => {
+const restartOnKey = async () => {
   if (!showGameOver.value || !gameManager.value || !scene) return
   showGameOver.value = false
   window.removeEventListener('keydown', restartOnKey)
@@ -370,7 +370,7 @@ const restartOnKey = () => {
 
   gameManager.value.destroy()
   gameManager.value = new GameManager()
-  gameManager.value.init(scene, GAME_WIDTH, GAME_HEIGHT)
+  await gameManager.value.init(scene, GAME_WIDTH, GAME_HEIGHT)
   gameManager.value.isGameActive = true
 }
 
@@ -528,7 +528,7 @@ const fitCanvas = () => {
 }
 
 // --- マウント ---
-onMounted(() => {
+onMounted(async () => {
   if (!gameContainer.value) return
 
   window.addEventListener('keydown', startOnKey)
@@ -555,9 +555,17 @@ onMounted(() => {
   )
   camera.position.set(0, 0, 100)
 
+  // --- Lighting ---
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.0)
+  scene.add(ambientLight)
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0)
+  directionalLight.position.set(0, 0, 100)
+  scene.add(directionalLight)
+
   // --- GameManager 初期化 ---
   const gm = new GameManager()
-  gm.init(scene, GAME_WIDTH, GAME_HEIGHT)
+  await gm.init(scene, GAME_WIDTH, GAME_HEIGHT)
   gameManager.value = gm
 
   // --- メインループ開始 ---

@@ -9,7 +9,7 @@ import type { Player, SpawnBulletFn } from '../Player'
  * プレイヤーが正面から向かってきた場合は横に回避する。
  */
 export class Fighter extends GameObject {
-  protected shipBody: THREE.Mesh | undefined
+  protected shipBody: THREE.Object3D | undefined
   public speed: number = 7
   public rotationSpeed: number = 0.08
   public fireInterval: number = 60
@@ -28,6 +28,7 @@ export class Fighter extends GameObject {
     player: Player,
     spawnBullet: SpawnBulletFn,
     wave: number,
+    externalModel?: THREE.Object3D,
   ) {
     super(x, y)
     this.side = 'enemy'
@@ -38,11 +39,34 @@ export class Fighter extends GameObject {
     this.mesh.position.z = 1
 
     this.lookAtPlayer()
-    this.createMesh()
+    this.createMesh(externalModel)
     this.fireCooldown = Math.random() * this.fireInterval
   }
 
-  protected createMesh(): void {
+  protected createMesh(externalModel?: THREE.Object3D): void {
+    if (externalModel) {
+      this.shipBody = externalModel
+      this.mesh.add(externalModel)
+
+      // 向きとスケール調整 (敵機用)
+      // externalModel.rotation.x = Math.PI / 2 // 自機で不要だったのでここでも不要の可能性が高い
+      externalModel.scale.set(18, 18, 18) // Fighter は自機より少し小さめ
+
+      externalModel.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.material) {
+            child.material = child.material.clone()
+            if (child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.color.setHex(0xff3333)
+              child.material.emissive.setHex(0xff3333)
+              child.material.emissiveIntensity = 0.5
+            }
+          }
+        }
+      })
+      return
+    }
+
     const geometry = new THREE.BufferGeometry()
 
     // 頂点定義 (三角形ベースの楔形)

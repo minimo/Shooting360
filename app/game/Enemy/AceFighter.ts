@@ -35,73 +35,25 @@ export class AceFighter extends Fighter {
     _addObject: (obj: GameObject) => void,
     spawnAfterimage: SpawnAfterimageFn,
     wave: number,
+    externalModel?: THREE.Object3D,
   ) {
-    super(x, y, player, spawnBullet, wave)
+    super(x, y, player, spawnBullet, wave, externalModel)
     this.trail = new TrailEffect(spawnAfterimage, 10, 40, 0xffffff, 1.0, 10)
     this.fireInterval = Math.max(30, 120 - (wave - 1) * 10)
     this.fireCooldown = Math.random() * this.fireInterval
-    this.updateGraphics()
-  }
-
-  private updateGraphics(): void {
-    // 既存の子を削除・dispose
-    while (this.mesh.children.length > 0) {
-      const child = this.mesh.children[0]!
-      this.mesh.remove(child)
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose()
-          ; (child.material as THREE.Material).dispose()
-      }
+    if (externalModel) {
+      externalModel.scale.set(24, 24, 24) // AceFighter は通常の Fighter より少し大きめ
+      externalModel.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.material && child.material instanceof THREE.MeshStandardMaterial) {
+            child.material.color.setHex(0xffff00) // エース機は黄色
+            child.material.emissive.setHex(0xffff00)
+          }
+        }
+      })
     }
-
-    const geometry = new THREE.BufferGeometry()
-    // 頂点定義 (自機と同じ鏃型楔形、サイズも同様)
-    const vertices = new Float32Array([
-      // 上面 (前, 右後上, 中後上, 左後上)
-      0, 19.2, 0, 14.4, -15.6, 4.8, 0, -7.2, 4.8,
-      0, 19.2, 0, 0, -7.2, 4.8, -14.4, -15.6, 4.8,
-
-      // 下面 (前, 右後下, 中後下, 左後下)
-      0, 19.2, 0, 0, -7.2, -4.8, 14.4, -15.6, -4.8,
-      0, 19.2, 0, -14.4, -15.6, -4.8, 0, -7.2, -4.8,
-
-      // 右側面
-      0, 19.2, 0, 14.4, -15.6, -4.8, 14.4, -15.6, 4.8,
-      14.4, -15.6, 4.8, 14.4, -15.6, -4.8, 0, -7.2, -4.8,
-      14.4, -15.6, 4.8, 0, -7.2, -4.8, 0, -7.2, 4.8,
-
-      // 左側面
-      0, 19.2, 0, -14.4, -15.6, 4.8, -14.4, -15.6, -4.8,
-      -14.4, -15.6, 4.8, 0, -7.2, 4.8, 0, -7.2, -4.8,
-      -14.4, -15.6, 4.8, 0, -7.2, -4.8, -14.4, -15.6, -4.8,
-
-      // 背面 (右)
-      14.4, -15.6, 4.8, 14.4, -15.6, -4.8, 0, -7.2, -4.8,
-      14.4, -15.6, 4.8, 0, -7.2, -4.8, 0, -7.2, 4.8,
-
-      // 背面 (左)
-      -14.4, -15.6, 4.8, 0, -7.2, 4.8, 0, -7.2, -4.8,
-      -14.4, -15.6, 4.8, 0, -7.2, -4.8, -14.4, -15.6, -4.8,
-    ])
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
-    geometry.computeVertexNormals()
-
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xff3333,
-      flatShading: true,
-      side: THREE.DoubleSide,
-    })
-
-    const mesh = new THREE.Mesh(geometry, material)
-    // @ts-ignore: protected access
-    this.shipBody = mesh
-    this.mesh.add(mesh)
-
-    // 発光設定
-    material.emissive.setHex(0xff3333)
-    material.emissiveIntensity = 0.5
   }
+
 
   public override update(delta: number, ..._args: any[]): void {
     if (!this.isAlive) return

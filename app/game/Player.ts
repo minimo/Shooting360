@@ -25,7 +25,7 @@ export type SpawnPlayerHomingMissileFn = (x: number, y: number) => boolean
  * 自機クラス
  */
 export class Player extends GameObject {
-  private shipBody: THREE.Mesh | undefined
+  private shipBody: THREE.Object3D | undefined
   public maxHp: number = 20
   public hp: number = 20
 
@@ -82,6 +82,7 @@ export class Player extends GameObject {
     spawnBullet: SpawnBulletFn,
     spawnAfterimage: SpawnAfterimageFn,
     spawnHomingMissile: SpawnPlayerHomingMissileFn,
+    externalModel?: THREE.Object3D,
   ) {
     super(x, y)
     this.spawnBullet = spawnBullet
@@ -100,7 +101,7 @@ export class Player extends GameObject {
       ],
     })
 
-    this.createMesh()
+    this.createMesh(externalModel)
     this.mesh.add(this.powerGauge)
 
     this.trail = new TrailEffect(spawnAfterimage, 10, 40, 0xffffff, 1.0, 10)
@@ -115,7 +116,29 @@ export class Player extends GameObject {
     }
   }
 
-  private createMesh(): void {
+  private createMesh(externalModel?: THREE.Object3D): void {
+    if (externalModel) {
+      this.shipBody = externalModel
+      this.mesh.add(externalModel)
+
+      externalModel.scale.set(25, 25, 25)
+
+      // モデルの全てのメッシュに対して、ライティングがない場所でも見えるように微調整
+      externalModel.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.material) {
+            child.material.side = THREE.DoubleSide
+            // MeshStandardMaterial の場合は環境光の影響を強く受けるように
+            if (child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissiveIntensity = 0.5
+            }
+          }
+        }
+      })
+
+      return
+    }
+
     const geometry = new THREE.BufferGeometry()
 
     // 頂点定義 (楔形: 前が薄く、後が厚い)
@@ -358,7 +381,7 @@ export class Player extends GameObject {
     // 子メッシュを y軸 (先端方向) を軸にロールさせる
     // これにより、先端の向きを変えずに機体だけを傾けることができる
     if (this.shipBody) {
-      this.shipBody.rotation.y = this.rotation
+      this.shipBody.rotation.y = Math.PI - this.rotation
     }
   }
 }
