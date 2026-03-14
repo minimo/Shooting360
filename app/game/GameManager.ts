@@ -520,6 +520,12 @@ export class GameManager {
       this.player.laserPower = this.player.maxLaserPower
       this.player.isLaserOverheated = false
     }
+    // 敵の弾と誘導弾を消去
+    for (const obj of this.objects) {
+      if ((obj instanceof Bullet && obj.side === 'enemy') || obj instanceof HomingMissile) {
+        obj.isAlive = false
+      }
+    }
     this.pendingPowerUpSelections++
     this.powerUpReason = 'wave'
     this.isWaitingForNextWaveTriggerPending = true
