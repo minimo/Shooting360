@@ -181,7 +181,15 @@ export class GameManager {
       console.error('Failed to load enemy model:', e)
       return null
     })
-    this.enemyBaseModel = enemyGltf ? enemyGltf.scene : null
+    if (enemyGltf) {
+      const wrapper = new THREE.Group()
+      // X軸周りで90度反時計回りに回転
+      enemyGltf.scene.rotation.x = Math.PI / 2
+      wrapper.add(enemyGltf.scene)
+      this.enemyBaseModel = wrapper
+    } else {
+      this.enemyBaseModel = null
+    }
 
     // 自機
     this.player = new Player(
@@ -391,15 +399,15 @@ export class GameManager {
           gm.player.maxSpeed *= 1.15
         },
       },
-      {
-        id: 'homing_laser',
-        name: 'ホーミングレーザー',
-        description:
-          'メインレーザー発射中、敵を追尾するレーザーを自動で発射します',
-        rarity: 3,
-        maxLevel: 5,
-        effect: (_gm) => { },
-      },
+      // {
+      //   id: 'homing_laser',
+      //   name: 'ホーミングレーザー',
+      //   description:
+      //     'メインレーザー発射中、敵を追尾するレーザーを自動で発射します',
+      //   rarity: 3,
+      //   maxLevel: 5,
+      //   effect: (_gm) => { },
+      // },
     ]
   }
 
@@ -984,7 +992,7 @@ export class GameManager {
 
     const rand = Math.random()
     if (rand < aceRate) {
-      const model = this.sharedBaseModel ? SkeletonUtils.clone(this.sharedBaseModel) : undefined
+      const model = this.enemyBaseModel ? SkeletonUtils.clone(this.enemyBaseModel) : undefined
       this.addObject(
         new AceFighter(
           x,
