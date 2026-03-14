@@ -46,8 +46,11 @@ export class AceFighter extends Fighter {
       externalModel.traverse((child) => {
         if (child instanceof THREE.Mesh) {
           if (child.material && child.material instanceof THREE.MeshStandardMaterial) {
-            child.material.color.setHex(0xffff00) // エース機は黄色
+            // エース機用にマテリアルをcloneしてから黄色で上書きする
+            child.material = child.material.clone()
+            child.material.color.setHex(0xffff00)
             child.material.emissive.setHex(0xffff00)
+            child.material.emissiveIntensity = 0.5
           }
         }
       })

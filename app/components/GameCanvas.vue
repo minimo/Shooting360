@@ -560,7 +560,8 @@ onMounted(async () => {
   scene.add(ambientLight)
 
   const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0)
-  directionalLight.position.set(0, 0, 100)
+  // 光源を左上から当てる (OrthographicCameraの左上が -width/2, +height/2)
+  directionalLight.position.set(-GAME_WIDTH / 2, GAME_HEIGHT / 2, 100)
   scene.add(directionalLight)
 
   // --- GameManager 初期化 ---

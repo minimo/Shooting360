@@ -55,10 +55,10 @@ export class Fighter extends GameObject {
       externalModel.traverse((child) => {
         if (child instanceof THREE.Mesh) {
           if (child.material) {
+            // 元のマテリアルのクローンを作成し、emissiveIntensity のみ調整して
+            // モデル本来の色を生かすようにする
             child.material = child.material.clone()
             if (child.material instanceof THREE.MeshStandardMaterial) {
-              child.material.color.setHex(0xff3333)
-              child.material.emissive.setHex(0xff3333)
               child.material.emissiveIntensity = 0.5
             }
           }
