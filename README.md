@@ -13,7 +13,7 @@
 | ⬆️ **Arrow Up** | 前方加速 |
 | ⬇️ **Arrow Down** | 減速 |
 | ⬅️➡️ **Left / Right** | 360度回転 |
-| 🔫 **Z** | 通常弾（連射） / メニュー選択 |
+| 🔫 **Z** | 通常弾（連射） / メニュー選択 / ゲーム開始 |
 | ⚡ **X** | レーザー（チャージ式） / メニュー戻る / 選択 |
 | 🚀 **C** | ブースト（高速回避移動） |
 | ⏸️ **Esc** | 一時停止 |
@@ -46,10 +46,9 @@
 
 | 技術 | 用途 |
 |---|---|
-| **Nuxt 4** | フレームワーク（SPA構成） |
-| **Three.js** | 3D/2D レンダリングエンジン（WebGL） |
+| **Nuxt 4** / **Vue 3** | フレームワーク（SPA構成、ルートコンポーネント・UIページ管理） |
+| **Three.js** | 3D/2D ゲーム描画エンジン（背景、エフェクト、ゲームオブジェクト、各種ライト） |
 | **TypeScript** | OOP ベースのゲームロジック |
-| **Vue 3** | UI / HUD コンポーネント |
 
 ---
 
@@ -59,28 +58,22 @@
 Shooting360/
 ├── app/
 │   ├── app.vue                    # ルートコンポーネント
-│   ├── pages/index.vue            # ゲームページ
-│   ├── components/GameCanvas.vue  # Three.js初期化 + メインループ + HUD
-│   ├── composables/useInput.ts    # キーボード入力管理
+│   ├── pages/
+│   │   └── index.vue              # メインゲームページ
+│   ├── components/
+│   │   └── GameCanvas.vue         # Three.js 初期化 + メインループ
+│   ├── composables/
+│   │   └── useInput.ts            # キーボード入力管理
 │   └── game/
 │       ├── GameObject.ts          # 基底クラス（THREE.Object3D をラップ）
 │       ├── Player.ts              # 自機（加速・武器・パワーアップ反映）
 │       ├── Bullet.ts              # 弾丸
-│       ├── Enemy/                 # 敵機関連
-│       │   ├── Fighter.ts         # 標準敵
-│       │   ├── AceFighter.ts      # 強化敵
-│       │   └── MissileFlower.ts   # ミサイル射出敵
+│       ├── Enemy/                 # 敵機関連（Fighter, AceFighter, MissileFlower）
 │       ├── HomingMissile.ts       # 誘導ミサイル
-│       ├── Laser.ts               # レーザー武器
-│       ├── HomingLaser.ts         # 追尾型レーザー（強化項目）
-│       ├── Explosion.ts           # 爆発エフェクト
-│       ├── Particle.ts            # 汎用パーティクル
-│       ├── Afterimage.ts          # 残像エフェクト
-│       ├── TrailEffect.ts         # 軌跡エフェクト
-│       ├── Gauge.ts               # ゲージ描画
-│       ├── Minimap.ts             # ミニマップ描画
-│       ├── BackgroundObject.ts    # 背景（星々）
-│       └── GameManager.ts         # 全体管理（シーン更新・衝突判定・Wave管理）
+│       ├── Laser.ts, HomingLaser.ts # レーザー武器系
+│       ├── GameManager.ts         # 全体管理（シーン更新・衝突判定・Wave管理）
+│       └── ...                    # その他各種エフェクト・HUD・背景等管理クラス
+├── public/                        # モデルデータ (.glb), 画像などの静的アセット
 ├── nuxt.config.ts
 ├── package.json
 └── tsconfig.json
@@ -94,24 +87,23 @@ Shooting360/
 # 依存パッケージのインストール
 npm install
 
-# 開発サーバー起動 (デフォルトポート: 3330)
+# 開発サーバー起動 (ポート: 3330)
 npm run dev
 ```
 
-ブラウザで `http://localhost:3330` を開き、Z または X キーでゲーム開始。
+ブラウザで `http://localhost:3330` を開き、タイトル画面から Z または X キーでゲーム開始。
 
 ---
 
 ## 📐 設計思想
 
-### 座標系とレンダリング
-- **ゲームロジック**: 2D座標系（x=右, y=下）で計算。
+### ハイブリッド描画と座標系
+- **ゲームロジック**: 内部的には2Dと軽量3Dの計算を組み合わせ、`WORLD_SIZE` に基づく無限ループする空間を管理。
 - **レンダリング**: `OrthographicCamera` を使用し、Three.js の座標系（x=右, y=上）へ変換して描画。
-- **マップループ**: `WORLD_SIZE` に基づいた空間ループを `GameObject` レベルで実装。
 
-### 拡張性
-- `GameObject` を継承することで、新しいエンティティ（敵、弾、エフェクト）を容易に追加可能。
-- `GameManager` のパワーアップシステムにより、複雑な武器強化やステータス変更を一括管理。
+### 拡張性と管理
+- `GameObject` を継承することで、新しいエンティティを共通のインターフェースで追加可能。
+- `GameManager` が、ウェーブ管理やパワーアップシステムによる複雑な武器強化を一元管理し、ゲームループ全体を統制。
 
 ---
 
