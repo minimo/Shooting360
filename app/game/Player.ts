@@ -289,27 +289,50 @@ export class Player extends GameObject {
 
     switch (this.weaponType) {
       case 'normal': {
-        const offsetDist = 6
+        const offsetDist = 8
+        const forwardOffset = 8
         const perpAngle = rotation + Math.PI / 2
-        this.spawnBullet(
-          x + Math.sin(perpAngle) * offsetDist,
-          y - Math.cos(perpAngle) * offsetDist,
-          rotation,
-          'player',
-        )
+        
+        // 左側の弾
         this.spawnBullet(
           x - Math.sin(perpAngle) * offsetDist,
           y + Math.cos(perpAngle) * offsetDist,
           rotation,
           'player',
         )
+        // 右側の弾
+        this.spawnBullet(
+          x + Math.sin(perpAngle) * offsetDist,
+          y - Math.cos(perpAngle) * offsetDist,
+          rotation,
+          'player',
+        )
+        // 中央少し先の弾
+        this.spawnBullet(
+          x + Math.sin(rotation) * forwardOffset,
+          y - Math.cos(rotation) * forwardOffset,
+          rotation,
+          'player',
+        )
         break
       }
       case '3way':
-        for (let i = -1; i <= 1; i++) this.spawnBullet(x, y, rotation + i * 0.2, 'player')
+        for (let i = -1; i <= 1; i++) {
+          const angle = rotation + i * 0.2
+          const perp = angle + Math.PI / 2
+          const off = 4
+          this.spawnBullet(x + Math.sin(perp) * off, y - Math.cos(perp) * off, angle, 'player')
+          this.spawnBullet(x - Math.sin(perp) * off, y + Math.cos(perp) * off, angle, 'player')
+        }
         break
       case '5way':
-        for (let i = -2; i <= 2; i++) this.spawnBullet(x, y, rotation + i * 0.2, 'player')
+        for (let i = -2; i <= 2; i++) {
+          const angle = rotation + i * 0.2
+          const perp = angle + Math.PI / 2
+          const off = 4
+          this.spawnBullet(x + Math.sin(perp) * off, y - Math.cos(perp) * off, angle, 'player')
+          this.spawnBullet(x - Math.sin(perp) * off, y + Math.cos(perp) * off, angle, 'player')
+        }
         break
       case 'wide':
         for (let i = -2; i <= 2; i++) {

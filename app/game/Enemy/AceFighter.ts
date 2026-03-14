@@ -12,7 +12,7 @@ import type { Player, SpawnBulletFn, SpawnAfterimageFn } from '../Player'
 export class AceFighter extends Fighter {
   public override speed: number = 16.8
   public override rotationSpeed: number = 0.15
-  public override hp: number = 10
+  public override hp: number = 5
   public override fireInterval: number = 60
 
   public isRepositioning: boolean = false
@@ -40,6 +40,7 @@ export class AceFighter extends Fighter {
     super(x, y, player, spawnBullet, wave, externalModel)
     this.trail = new TrailEffect(spawnAfterimage, 10, 40, 0xffffff, 1.0, 10)
     this.fireInterval = Math.max(30, 120 - (wave - 1) * 10)
+    this.radius = 25
     this.fireCooldown = Math.random() * this.fireInterval
     if (externalModel) {
       externalModel.scale.set(24, 24, 24) // AceFighter は通常の Fighter より少し大きめ

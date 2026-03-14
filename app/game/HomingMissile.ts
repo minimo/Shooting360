@@ -30,7 +30,7 @@ export class HomingMissile extends GameObject {
   ) {
     super(x, y)
     this.side = side // Assign side from constructor argument
-    this.radius = 6
+    this.radius = side === 'player' ? 10 : 6
     this.rotation = angle
     this.target = playerOrTarget // Assign target from constructor argument
     this.origin = { x, y }

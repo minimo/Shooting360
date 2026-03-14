@@ -15,7 +15,7 @@ export class Fighter extends GameObject {
   public fireInterval: number = 60
   protected fireCooldown: number = 0
   private offsetSign: number = Math.random() < 0.5 ? 1 : -1
-  public hp: number = 3
+  public hp: number = 1
   protected player: Player
   private spawnBullet: SpawnBulletFn
   private isEvading: boolean = false
@@ -32,7 +32,7 @@ export class Fighter extends GameObject {
   ) {
     super(x, y)
     this.side = 'enemy'
-    this.radius = 15
+    this.radius = 20
     this.player = player
     this.spawnBullet = spawnBullet
     this.fireInterval = Math.max(30, 120 - (wave - 1) * 10)

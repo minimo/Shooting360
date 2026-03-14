@@ -18,7 +18,7 @@ export class MissileFlower extends GameObject {
   private orbitDirection: number = Math.random() < 0.5 ? 1 : -1
   private minDistance: number = 300
   private maxDistance: number = 500
-  public hp: number = 10
+  public hp: number = 5
   private player: Player
   private spawnHomingMissile: SpawnHomingMissileFn
   private wave: number
@@ -34,7 +34,7 @@ export class MissileFlower extends GameObject {
   ) {
     super(x, y)
     this.side = 'enemy'
-    this.radius = 27
+    this.radius = 35
     this.player = player
     this.spawnHomingMissile = spawnHomingMissile
     this.wave = wave

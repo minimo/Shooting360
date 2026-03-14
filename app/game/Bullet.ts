@@ -35,7 +35,7 @@ export class Bullet extends GameObject {
   ) {
     super(x, y)
     this.side = side
-    this.radius = 3
+    this.radius = side === 'player' ? 6 : 3
     this.rotation = angle
     this.origin = { x, y }
     this.damage = damage
