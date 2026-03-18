@@ -84,7 +84,7 @@ export class Laser extends GameObject {
         depthWrite: false,
       })
       const mesh = new THREE.Mesh(geo, mat)
-      mesh.position.set(0, this.maxLength / 2, 0)
+      mesh.position.set(0, this.maxLength / 2 + 15, 0)
       group.add(mesh)
       this.afterimageMeshes.push(mesh)
       this.afterimageGroups.push(group)
@@ -107,7 +107,7 @@ export class Laser extends GameObject {
         depthWrite: false,
       }),
     )
-    this.glowMesh.position.set(0, this.maxLength / 2, 0.1)
+    this.glowMesh.position.set(0, this.maxLength / 2 + 15, 0.1)
     this.mesh.add(this.glowMesh)
 
     // コア（白い芯 - そのまま）
@@ -116,7 +116,7 @@ export class Laser extends GameObject {
       coreGeo,
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }),
     )
-    this.coreMesh.position.set(0, this.maxLength / 2, 0.2)
+    this.coreMesh.position.set(0, this.maxLength / 2 + 15, 0.2)
     this.mesh.add(this.coreMesh)
 
     // チャージ演出（円）
@@ -125,6 +125,7 @@ export class Laser extends GameObject {
       chargeGeo,
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }),
     )
+    this.chargeMesh.position.y = 15
     this.chargeMesh.position.z = 0.3
     this.mesh.add(this.chargeMesh)
 
@@ -133,7 +134,8 @@ export class Laser extends GameObject {
       chargeGlowGeo,
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 }),
     )
-    this.chargeGlowMesh.position.z = 0.25
+    this.chargeGlowMesh.position.y = 15
+    this.chargeGlowMesh.position.z = 0.15
     this.mesh.add(this.chargeGlowMesh)
 
     this.mesh.visible = false
@@ -200,7 +202,7 @@ export class Laser extends GameObject {
         if (mesh.geometry.parameters.width !== 16) {
           mesh.geometry.dispose()
           mesh.geometry = new THREE.PlaneGeometry(16, this.maxLength)
-          mesh.position.set(0, this.maxLength / 2, 0)
+          mesh.position.set(0, this.maxLength / 2 + 15, 0)
         }
       }
 
@@ -211,12 +213,12 @@ export class Laser extends GameObject {
       if (Math.abs(this.glowMesh.geometry.parameters.width - glowW) > 0.1) {
         this.glowMesh.geometry.dispose()
         this.glowMesh.geometry = new THREE.PlaneGeometry(glowW, this.maxLength)
-        this.glowMesh.position.set(0, this.maxLength / 2, 0.1)
+        this.glowMesh.position.set(0, this.maxLength / 2 + 15, 0.1)
       }
       if (Math.abs(this.coreMesh.geometry.parameters.width - coreW) > 0.1) {
         this.coreMesh.geometry.dispose()
         this.coreMesh.geometry = new THREE.PlaneGeometry(coreW, this.maxLength)
-        this.coreMesh.position.set(0, this.maxLength / 2, 0.2)
+        this.coreMesh.position.set(0, this.maxLength / 2 + 15, 0.2)
       }
 
       if (this.glowMesh.material.uniforms.opacity) {
@@ -258,10 +260,18 @@ export class Laser extends GameObject {
     }
   }
 
-  public getEndPoint(): { x: number; y: number } {
+  public getStartPoint(): { x: number; y: number } {
     return {
-      x: this.position.x + Math.sin(this.rotation) * this.maxLength,
-      y: this.position.y - Math.cos(this.rotation) * this.maxLength,
+      x: this.position.x + Math.sin(this.rotation) * 15,
+      y: this.position.y - Math.cos(this.rotation) * 15,
+    }
+  }
+
+  public getEndPoint(): { x: number; y: number } {
+    const start = this.getStartPoint()
+    return {
+      x: start.x + Math.sin(this.rotation) * this.maxLength,
+      y: start.y - Math.cos(this.rotation) * this.maxLength,
     }
   }
 

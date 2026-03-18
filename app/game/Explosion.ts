@@ -35,14 +35,15 @@ export class Explosion extends GameObject {
     this.mesh.position.z = 3
 
     // メインの爆発円
-    const geo = new THREE.CircleGeometry(this.maxRadius, 16)
+    const segments = this.maxRadius > 200 ? 64 : 32
+    const geo = new THREE.CircleGeometry(this.maxRadius, segments)
     this.mainMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 })
     const mainMesh = new THREE.Mesh(geo, this.mainMat)
     this.mesh.add(mainMesh)
 
     // フラッシュ効果
     if (isFlashy) {
-      const fGeo = new THREE.CircleGeometry(this.maxRadius * 0.7, 16)
+      const fGeo = new THREE.CircleGeometry(this.maxRadius * 0.7, segments)
       this.flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.8, transparent: true })
       const flash = new THREE.Mesh(fGeo, this.flashMat)
       flash.position.z = 0.1

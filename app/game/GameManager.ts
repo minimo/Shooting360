@@ -4,6 +4,9 @@ import { Bullet } from './Bullet'
 import { Fighter } from './Enemy/Fighter'
 import { AceFighter } from './Enemy/AceFighter'
 import { MissileFlower } from './Enemy/MissileFlower'
+import { CoreDestroyer } from './Enemy/CoreDestroyer'
+import { CoreShield } from './Enemy/CoreShield'
+import { BossDestructionEffect } from './BossDestructionEffect'
 import { Explosion } from './Explosion'
 import { Particle } from './Particle'
 import { Minimap } from './Minimap'
@@ -56,8 +59,8 @@ export class GameManager {
   // スコア・レベル（Vue に公開）
   public score: number = 0
   public playerLevel: number = 0
-  public scoreForNextPowerUp: number = 1000
-  private currentPowerUpInterval: number = 1000
+  public scoreForNextPowerUp: number = 3000
+  private currentPowerUpInterval: number = 3000
   private pendingPowerUpSelections: number = 0
   private isWaitingForNextWaveTriggerPending: boolean = false
   public powerUpListEntries: string[] = []
@@ -122,8 +125,8 @@ export class GameManager {
     this.gameOverTimer = 0
     this.score = 0
     this.playerLevel = 0
-    this.scoreForNextPowerUp = 1000
-    this.currentPowerUpInterval = 1000
+    this.scoreForNextPowerUp = 3000
+    this.currentPowerUpInterval = 3000
     this.pendingPowerUpSelections = 0
     this.isWaitingForNextWaveTriggerPending = false
     this.currentWave = 0
@@ -508,6 +511,9 @@ export class GameManager {
       enemyCounts[this.currentWave] ?? 15 + (this.currentWave - 5) * 5
 
     const isBossWave = this.currentWave % 5 === 0
+    if (isBossWave) {
+      this.totalEnemiesInWave = 1 // ボス1体
+    }
     const text = isBossWave
       ? `WAVE ${this.currentWave} BOSS START`
       : `WAVE ${this.currentWave} START`
@@ -670,7 +676,7 @@ export class GameManager {
       this.player.hp = this.player.maxHp // レベルアップ時に体力全回復
       this.pendingPowerUpSelections++
       this.powerUpReason = 'level'
-      this.currentPowerUpInterval += 500
+      this.currentPowerUpInterval += 1000
       this.scoreForNextPowerUp += this.currentPowerUpInterval
       leveledUp = true
     }
@@ -829,8 +835,8 @@ export class GameManager {
       this.laser.state === LaserState.CHARGING ||
       this.laser.state === LaserState.FIRING
     ) {
-      const tipX = this.player.position.x + Math.sin(this.player.rotation) * 20
-      const tipY = this.player.position.y - Math.cos(this.player.rotation) * 20
+      const tipX = this.player.position.x + Math.sin(this.player.rotation) * 15
+      const tipY = this.player.position.y - Math.cos(this.player.rotation) * 15
       const intensity =
         this.laser.state === LaserState.CHARGING ? this.laser.chargeProgress : 1.0
       const pCount =
@@ -894,7 +900,7 @@ export class GameManager {
         this.enemySpawnTimer -= delta
         if (this.enemySpawnTimer <= 0) {
           const enemyCount = this.objects.filter(
-            (obj) => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive,
+            (obj) => (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer) && obj.isAlive,
           ).length
           const maxSimultaneous = 5 + Math.floor(this.currentWave / 2)
           if (enemyCount < maxSimultaneous) this.spawnEnemy()
@@ -912,7 +918,7 @@ export class GameManager {
         this.totalEnemiesInWave > 0
       ) {
         const enemyCount = this.objects.filter(
-          (obj) => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive,
+          (obj) => (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer) && obj.isAlive,
         ).length
         if (enemyCount === 0) {
           this.isWaitingForClearAnnouncement = true
@@ -988,6 +994,23 @@ export class GameManager {
     if (!this.scene) return
     this.waveEnemiesSpawned++
 
+    const isBossWave = this.currentWave > 0 && this.currentWave % 5 === 0
+    if (isBossWave) {
+      const boss = new CoreDestroyer(
+        this.player.position.x + 1000,
+        this.player.position.y,
+        this.player,
+        (ex, ey, ea) => this.spawnBullet(ex, ey, ea, 'enemy'),
+        (obj) => this.addObject(obj),
+        this.currentWave,
+      )
+      this.addObject(boss)
+      for (let i = 0; i < 4; i++) {
+        this.addObject(new CoreShield(boss, i))
+      }
+      return
+    }
+
     const aceRate = this.currentWave >= 4 ? Math.min(0.4, (this.currentWave - 3) * 0.1) : 0
     const sniperRate = Math.min(0.8, (this.currentWave - 1) * 0.15)
 
@@ -1042,15 +1065,15 @@ export class GameManager {
     ) as Bullet[]
     const enemies = this.objects.filter(
       (obj) =>
-        (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive,
-    ) as (Fighter | MissileFlower)[]
+        (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer || obj instanceof CoreShield) && obj.isAlive,
+    ) as (Fighter | MissileFlower | CoreDestroyer | CoreShield)[]
 
     // レーザー vs 敵機
     if (
       this.laser.state === LaserState.FIRING &&
       (this.powerUpLevels['homing_laser'] || 0) <= 0
     ) {
-      const start = this.player.position
+      const start = this.laser.getStartPoint()
       const end = this.laser.getEndPoint()
       for (const enemy of enemies) {
         if (
@@ -1073,13 +1096,17 @@ export class GameManager {
             enemy.velocity.y,
           )
           if (!enemy.isAlive) {
-            this.spawnDestructionEffect(
-              enemy.position.x,
-              enemy.position.y,
-              enemy.velocity.x,
-              enemy.velocity.y,
-            )
-            this.addScore(enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+            if (enemy instanceof CoreDestroyer) {
+              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+            } else {
+              this.spawnDestructionEffect(
+                enemy.position.x,
+                enemy.position.y,
+                enemy.velocity.x,
+                enemy.velocity.y,
+              )
+            }
+            this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
           }
         }
       }
@@ -1088,6 +1115,21 @@ export class GameManager {
     for (const bullet of bullets) {
       if (bullet.side === 'player') {
         for (const enemy of enemies) {
+          if (enemy instanceof CoreShield) {
+              const isHit = enemy.checkHit(bullet.position.x, bullet.position.y, bullet.radius)
+              if (isHit) {
+                  if (!bullet.isPiercing) bullet.isAlive = false
+                  enemy.takeDamage(bullet.damage)
+                  this.spawnHitEffect(bullet.position.x, bullet.position.y, 0xffffff, bullet.velocity.x, bullet.velocity.y)
+                  this.addScore(10)
+                  if (!enemy.isAlive) {
+                      this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                      this.addScore(1000)
+                  }
+                  if (!bullet.isPiercing) break
+              }
+              continue
+          }
           if (this.hitTest(bullet, enemy)) {
             if (!bullet.isPiercing) bullet.isAlive = false
             enemy.takeDamage(bullet.damage)
@@ -1100,13 +1142,17 @@ export class GameManager {
             )
             this.addScore(10)
             if (!enemy.isAlive) {
-              this.spawnDestructionEffect(
-                enemy.position.x,
-                enemy.position.y,
-                enemy.velocity.x,
-                enemy.velocity.y,
-              )
-              this.addScore(enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+              if (enemy instanceof CoreDestroyer) {
+                this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+              } else {
+                this.spawnDestructionEffect(
+                  enemy.position.x,
+                  enemy.position.y,
+                  enemy.velocity.x,
+                  enemy.velocity.y,
+                )
+              }
+              this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
             }
             if (!bullet.isPiercing) break
           }
@@ -1128,9 +1174,20 @@ export class GameManager {
     }
 
     for (const enemy of enemies) {
-      if (this.hitTest(this.player, enemy)) {
+      let isHit = false
+      if (enemy instanceof CoreShield) {
+        // 装甲板専用の精密判定
+        isHit = enemy.checkHit(this.player.position.x, this.player.position.y, this.player.radius)
+      } else {
+        isHit = this.hitTest(this.player, enemy)
+      }
+
+      if (isHit) {
         if (!this.isInWaveTransition) {
-          this.player.takeDamage(2)
+          const collisionDamage = Math.floor(2 / 10)
+          if (collisionDamage > 0) {
+            this.player.takeDamage(collisionDamage)
+          }
           this.shakeFrames = 15
         }
         const dx = this.player.position.x - enemy.position.x
@@ -1142,14 +1199,18 @@ export class GameManager {
           const bounceForce = 20
           this.player.velocity.x += nx * bounceForce
           this.player.velocity.y += ny * bounceForce
-          enemy.velocity.x -= nx * bounceForce
-          enemy.velocity.y -= ny * bounceForce
-          const overlap = this.player.radius + enemy.radius - dist
-          if (overlap > 0) {
-            this.player.position.x += nx * overlap * 0.5
-            this.player.position.y += ny * overlap * 0.5
-            enemy.position.x -= nx * overlap * 0.5
-            enemy.position.y -= ny * overlap * 0.5
+          
+          if (!(enemy instanceof CoreDestroyer)) {
+            // ボス以外の場合は敵も弾かれ、位置補正(overlap)を行う
+            enemy.velocity.x -= nx * bounceForce
+            enemy.velocity.y -= ny * bounceForce
+            const overlap = this.player.radius + enemy.radius - dist
+            if (overlap > 0) {
+              this.player.position.x += nx * overlap * 0.5
+              this.player.position.y += ny * overlap * 0.5
+              enemy.position.x -= nx * overlap * 0.5
+              enemy.position.y -= ny * overlap * 0.5
+            }
           }
         }
         this.spawnHitEffect(
@@ -1171,7 +1232,7 @@ export class GameManager {
 
     for (const missile of missiles) {
       if (this.laser.state === LaserState.FIRING) {
-        const start = this.player.position
+        const start = this.laser.getStartPoint()
         const end = this.laser.getEndPoint()
         if (
           this.lineCircleTest(
@@ -1236,6 +1297,18 @@ export class GameManager {
         }
       }
       for (const enemy of enemies) {
+        if (enemy instanceof CoreShield) {
+            const isHit = enemy.checkHit(ex.position.x, ex.position.y, ex.radius)
+            if (isHit && ex.canDealDamage(enemy)) {
+                enemy.takeDamage(ex.damage)
+                this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffaa00, 0, 0)
+                if (!enemy.isAlive) {
+                    this.spawnDestructionEffect(enemy.position.x, enemy.position.y, 0, 0)
+                    this.addScore(1000)
+                }
+            }
+            continue
+        }
         if (this.hitTest(ex, enemy)) {
           if (ex.canDealDamage(enemy)) {
             enemy.takeDamage(ex.damage)
@@ -1247,13 +1320,17 @@ export class GameManager {
               enemy.velocity.y,
             )
             if (!enemy.isAlive) {
-              this.spawnDestructionEffect(
-                enemy.position.x,
-                enemy.position.y,
-                enemy.velocity.x,
-                enemy.velocity.y,
-              )
-              this.addScore(enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+              if (enemy instanceof CoreDestroyer) {
+                this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+              } else {
+                this.spawnDestructionEffect(
+                  enemy.position.x,
+                  enemy.position.y,
+                  enemy.velocity.x,
+                  enemy.velocity.y,
+                )
+              }
+              this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
             }
           }
         }
@@ -1280,6 +1357,20 @@ export class GameManager {
     ) as HomingLaser[]
     for (const hl of homingLasers) {
       for (const enemy of enemies) {
+        if (enemy instanceof CoreShield) {
+            const isHit = enemy.checkHit(hl.position.x, hl.position.y, hl.radius)
+            if (isHit) {
+                enemy.takeDamage(hl.damage)
+                this.spawnHitEffect(hl.position.x, hl.position.y, 0xffff00, hl.velocity.x, hl.velocity.y)
+                hl.isAlive = false
+                if (!enemy.isAlive) {
+                    this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                    this.addScore(1000)
+                }
+                break
+            }
+            continue
+        }
         if (this.hitTest(hl, enemy)) {
           enemy.takeDamage(hl.damage)
           this.spawnHitEffect(
@@ -1291,15 +1382,35 @@ export class GameManager {
           )
           hl.isAlive = false
           if (!enemy.isAlive) {
-            this.spawnDestructionEffect(
-              enemy.position.x,
-              enemy.position.y,
-              enemy.velocity.x,
-              enemy.velocity.y,
-            )
-            this.addScore(enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+            if (enemy instanceof CoreDestroyer) {
+              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+            } else {
+              this.spawnDestructionEffect(
+                enemy.position.x,
+                enemy.position.y,
+                enemy.velocity.x,
+                enemy.velocity.y,
+              )
+            }
+            this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
           }
           break
+        }
+      }
+    }
+
+    // ボスのレーザー判定
+    for (const enemy of enemies) {
+      if (enemy instanceof CoreDestroyer && enemy.isFiringLaser()) {
+        const angle = enemy.getLaserAngle()
+        const startX = enemy.position.x
+        const startY = enemy.position.y
+        const endX = startX + Math.sin(angle) * 2000
+        const endY = startY - Math.cos(angle) * 2000
+        
+        if (this.lineCircleTest(startX, startY, endX, endY, this.player.position.x, this.player.position.y, this.player.radius)) {
+          this.player.takeDamage(0.5) // ボスのレーザーは多段ヒットするのでダメージは小さめに
+          this.shakeFrames = Math.max(this.shakeFrames, 5)
         }
       }
     }
@@ -1429,7 +1540,7 @@ export class GameManager {
     if (this.homingLaserTimer >= interval) {
       this.homingLaserTimer %= interval
       const enemies = this.objects.filter(
-        (obj) => (obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive,
+        (obj) => (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer) && obj.isAlive,
       )
       if (enemies.length === 0) return
 
