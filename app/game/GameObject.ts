@@ -59,6 +59,9 @@ export abstract class GameObject {
   /** 死亡演出中フラグ（true → 判定や行動は停止するが描画は継続） */
   public isDying: boolean = false
 
+  /** レーザーヒット時のクールダウン（フレーム数） */
+  public laserHitCooldown: number = 0
+
   constructor(x: number = 0, y: number = 0) {
     this.position = { x, y }
     this.velocity = { x: 0, y: 0 }

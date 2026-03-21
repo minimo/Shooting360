@@ -19,6 +19,16 @@
             :style="{ width: hpPercent + '%', background: hpBarColor }"
           />
         </div>
+        <!-- ボス HP ゲージ (プレイヤーゲージのすぐ下に表示) -->
+        <div v-if="isBossActive" class="boss-hp-bar-outer">
+          <div class="boss-label">BOSS</div>
+          <div class="boss-hp-bar-track">
+            <div
+              class="boss-hp-bar-fill"
+              :style="{ width: bossHpPercent + '%' }"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- ミニマップ -->
@@ -232,6 +242,8 @@ const announcementText = ref('')
 const announcementAlpha = ref(0)
 const bossWarningText = ref('')
 const isBossWarningActive = ref(false)
+const isBossActive = ref(false)
+const bossHpPercent = ref(0)
 const isKeyHeldOnPowerUpShow = ref(false)
 
 const isHudVisible = computed(() => !showOverlay.value && !showDebugMenu.value)
@@ -300,6 +312,9 @@ const gameLoop = (time: number) => {
   announcementAlpha.value = gm.announcementAlpha
   bossWarningText.value = gm.bossWarningText
   isBossWarningActive.value = gm.isBossWarningActive
+  
+  isBossActive.value = gm.isBossActive
+  bossHpPercent.value = gm.isBossActive ? (gm.bossHp / gm.bossMaxHp) * 100 : 0
 
   showPowerUp.value = gm.isPowerUpSelecting
   if (showPowerUp.value) powerUpOptions.value = gm.currentPowerUpOptions
@@ -690,6 +705,42 @@ onUnmounted(() => {
   height: 100%;
   border-radius: 10px;
   transition: width 0.1s ease, background 0.3s ease;
+}
+ 
+/* ボス HP ゲージ */
+.boss-hp-bar-outer {
+  margin: 6px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 320px; /* プレイヤー(400px)より一回り小さく */
+}
+ 
+.boss-label {
+  color: #ff33ff;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1rem;
+  text-shadow: 0 0 5px rgba(255, 51, 255, 0.5);
+  flex-shrink: 0;
+}
+ 
+.boss-hp-bar-track {
+  flex: 1;
+  height: 6px; /* プレイヤー(20px)より一回り細く */
+  background: rgba(40, 0, 40, 0.6);
+  border: 1px solid rgba(255, 51, 255, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+ 
+.boss-hp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff00ff 0%, #ff66aa 100%);
+  transition: width 0.2s ease;
+  box-shadow: 0 0 10px rgba(255, 0, 255, 0.4);
 }
 
 .minimap {

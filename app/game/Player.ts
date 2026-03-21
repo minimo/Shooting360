@@ -49,7 +49,7 @@ export class Player extends GameObject {
 
   public bulletSpeedMultiplier: number = 1.0
   public fireRateMultiplier: number = 1.0
-  public bulletDamage: number = 1
+  public bulletDamage: number = 10
   public bulletPiercing: boolean = false
 
   public damageReductionMultiplier: number = 1.0

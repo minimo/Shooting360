@@ -70,6 +70,9 @@ export class GameManager {
   public announcementAlpha: number = 0
   public bossWarningText: string = ''
   public isBossWarningActive: boolean = false
+  public bossHp: number = 0
+  public bossMaxHp: number = 0
+  public isBossActive: boolean = false
 
   // Wave 管理
   public currentWave: number = 0
@@ -932,9 +935,13 @@ export class GameManager {
     // 3. 全オブジェクト更新 & 当たり判定
     if (this.isGameActive || this.gameOverTimer > 0) {
       this.checkCollisions(delta)
+      this.syncBossStatus()
 
       for (const obj of this.objects) {
-        if (obj.isAlive) obj.update(delta)
+        if (obj.isAlive) {
+          obj.update(delta)
+          if (obj.laserHitCooldown > 0) obj.laserHitCooldown -= delta
+        }
         if (obj instanceof HomingMissile && obj.shouldExplode) {
           if (obj.isMaxDistanceExplosion) {
             this.spawnHomingExplosion(
@@ -1075,6 +1082,7 @@ export class GameManager {
     ) as (Fighter | MissileFlower | CoreDestroyer | CoreShield)[]
 
     // レーザー vs 敵機
+    // レーザー vs 敵機
     if (
       this.laser.state === LaserState.FIRING &&
       (this.powerUpLevels['homing_laser'] || 0) <= 0
@@ -1083,6 +1091,7 @@ export class GameManager {
       const end = this.laser.getEndPoint()
       for (const enemy of enemies) {
         if (
+          enemy.laserHitCooldown <= 0 &&
           this.lineCircleTest(
             start.x,
             start.y,
@@ -1094,6 +1103,7 @@ export class GameManager {
           )
         ) {
           enemy.takeDamage(10 * this.player.laserDamageMultiplier)
+          enemy.laserHitCooldown = 3.0 // 3フレーム（1/20秒）のクールタイム。当たった瞬間(0), 次はCD満了時(3)
           this.spawnHitEffect(
             enemy.position.x,
             enemy.position.y,
@@ -1101,11 +1111,25 @@ export class GameManager {
             enemy.velocity.x,
             enemy.velocity.y,
           )
-          const justDied = !enemy.isAlive || (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
+          const justDied =
+            !enemy.isAlive ||
+            (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
           if (justDied) {
             if (enemy instanceof CoreDestroyer) {
               enemy.isDying = true
-              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
+              this.addObject(
+                new BossDestructionEffect(
+                  enemy.position.x,
+                  enemy.position.y,
+                  (obj) => this.addObject(obj),
+                  (f) => {
+                    this.shakeFrames = Math.max(this.shakeFrames, f)
+                  },
+                  () => {
+                    enemy.isAlive = false
+                  },
+                ),
+              )
             } else {
               this.spawnDestructionEffect(
                 enemy.position.x,
@@ -1114,7 +1138,15 @@ export class GameManager {
                 enemy.velocity.y,
               )
             }
-            this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+            this.addScore(
+              enemy instanceof CoreDestroyer
+                ? 10000
+                : enemy instanceof AceFighter
+                ? 2000
+                : enemy instanceof MissileFlower
+                ? 1000
+                : 300,
+            )
           }
         }
       }
@@ -1625,6 +1657,27 @@ export class GameManager {
         obj.destroy()
         this.objects.splice(i, 1)
       }
+    }
+  }
+
+  /**
+   * 敵リストからボス（CoreDestroyer）を探し、HP情報を更新する
+   */
+  private syncBossStatus(): void {
+    let boss: CoreDestroyer | undefined
+    for (const obj of this.objects) {
+      if (obj instanceof CoreDestroyer && !obj.isDying) {
+        boss = obj
+        break
+      }
+    }
+
+    if (boss) {
+      this.bossHp = boss.hp
+      this.bossMaxHp = boss.maxHp
+      this.isBossActive = true
+    } else {
+      this.isBossActive = false
     }
   }
 }
