@@ -17,6 +17,8 @@ export class CoreDestroyer extends GameObject {
   private player: Player
   private spawnBullet: SpawnBulletFn
   private addObject: (obj: GameObject) => void
+  private wave: number
+  private setWarning: (text: string, active: boolean) => void
   
   private state: BossState = BossState.NORMAL
   private stateTimer: number = 0
@@ -25,8 +27,8 @@ export class CoreDestroyer extends GameObject {
   public shieldAngle: number = 0
   private shieldRotationSpeed: number = 0.005
   
-  private laserMesh: THREE.Mesh | null = null
-  private innerLaserMesh: THREE.Mesh | null = null
+  private laserMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null
+  private innerLaserMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null
   private laserContainer: THREE.Group = new THREE.Group()
 
   // 自機 Laser.ts と同等のシェーダー
@@ -72,7 +74,8 @@ export class CoreDestroyer extends GameObject {
     player: Player,
     spawnBullet: SpawnBulletFn,
     addObject: (obj: GameObject) => void,
-    wave: number
+    wave: number,
+    setWarning: (text: string, active: boolean) => void
   ) {
     super(x, y)
     this.side = 'enemy'
@@ -80,6 +83,8 @@ export class CoreDestroyer extends GameObject {
     this.player = player
     this.spawnBullet = spawnBullet
     this.addObject = addObject
+    this.wave = wave
+    this.setWarning = setWarning
     
     this.maxHp = 1200 + (wave - 5) * 400
     this.hp = this.maxHp
@@ -173,6 +178,7 @@ export class CoreDestroyer extends GameObject {
   }
 
   public takeDamage(amount: number): void {
+    if (this.isDying) return
     this.hp -= amount
     if (this.coreMesh && this.coreMesh.material instanceof THREE.MeshStandardMaterial) {
       this.coreMesh.material.emissive.setHex(0xff0000)
@@ -182,10 +188,14 @@ export class CoreDestroyer extends GameObject {
         }
       }, 50)
     }
-    if (this.hp <= 0) this.isAlive = false
+    if (this.hp <= 0) {
+      // 死亡判定はGameManager側で処理するためここでは何もしない
+    }
   }
 
   public override update(delta: number): void {
+    if (this.isDying) return
+
     this.stateTimer -= delta
     const currentRotSpeed = this.state === BossState.FIRING_LASER ? this.shieldRotationSpeed * 3 : this.shieldRotationSpeed
     this.shieldAngle += currentRotSpeed * delta
@@ -213,48 +223,54 @@ export class CoreDestroyer extends GameObject {
       case BossState.NORMAL:
         if (this.stateTimer <= 0) {
           this.state = BossState.PREPARING_LASER
-          this.stateTimer = 120 
+          this.stateTimer = 180 // 3秒 
         }
-        if (this.chargeMesh) this.chargeMesh.material.uniforms.opacity.value = 0
-        if (this.chargeGlowMesh) this.chargeGlowMesh.material.uniforms.opacity.value = 0
+        const cm = this.chargeMesh
+        const cgm = this.chargeGlowMesh
+        if (cm) (cm.material as THREE.ShaderMaterial).uniforms.opacity.value = 0
+        if (cgm) (cgm.material as THREE.ShaderMaterial).uniforms.opacity.value = 0
         break
         
       case BossState.PREPARING_LASER:
         this.laserContainer.rotation.z = -angleToPlayer
         
+        // カウントダウン警告の更新
+        const seconds = Math.max(1, Math.ceil(this.stateTimer / 60))
+        this.setWarning(`WARNING ${seconds}`, true)
+
         // チャージ演出 (自機 Laser.ts ロジックの拡大版)
-        const progress = 1 - (this.stateTimer / 120)
+        const progress = 1 - (this.stateTimer / 180)
         // 遠方から急激に収束させるため開始サイズを大きくする
         const baseSize = 800 * (1 - progress) + 120 
         
         if (this.chargeMesh) {
             this.chargeMesh.geometry.dispose()
             this.chargeMesh.geometry = new THREE.CircleGeometry(baseSize + 30, 64)
-            this.chargeMesh.material.uniforms.opacity.value = 1.0 * progress
+            ;(this.chargeMesh.material as THREE.ShaderMaterial).uniforms.opacity.value = 1.0 * progress
         }
         if (this.chargeGlowMesh) {
             this.chargeGlowMesh.geometry.dispose()
             this.chargeGlowMesh.geometry = new THREE.CircleGeometry(baseSize + 80, 64)
-            this.chargeGlowMesh.material.uniforms.opacity.value = 0.8 * progress
+            ;(this.chargeGlowMesh.material as THREE.ShaderMaterial).uniforms.opacity.value = 0.8 * progress
         }
 
         if (this.stateTimer <= 0) {
           this.state = BossState.FIRING_LASER
           this.stateTimer = 120 
           if (this.laserMesh) this.laserMesh.visible = true
+          this.setWarning('', false)
         }
         break
         
       case BossState.FIRING_LASER:
         if (this.laserMesh) {
-            const lMat = this.laserMesh.material as THREE.ShaderMaterial
-            lMat.uniforms.opacity.value = 0.6
+            ;(this.laserMesh.material as THREE.ShaderMaterial).uniforms.opacity.value = 0.6
         }
         if (this.innerLaserMesh) {
             ;(this.innerLaserMesh.material as THREE.MeshBasicMaterial).opacity = 1.0
         }
-        if (this.chargeMesh) this.chargeMesh.material.uniforms.opacity.value = 0
-        if (this.chargeGlowMesh) this.chargeGlowMesh.material.uniforms.opacity.value = 0
+        if (this.chargeMesh) (this.chargeMesh.material as THREE.ShaderMaterial).uniforms.opacity.value = 0
+        if (this.chargeGlowMesh) (this.chargeGlowMesh.material as THREE.ShaderMaterial).uniforms.opacity.value = 0
 
         if (this.stateTimer <= 0) {
           this.state = BossState.NORMAL
@@ -271,6 +287,14 @@ export class CoreDestroyer extends GameObject {
     }
   }
 
+
+  /**
+   * メッシュを破棄しリソースを解放
+   */
+  public override destroy(): void {
+    this.setWarning('', false)
+    super.destroy()
+  }
 
   public isFiringLaser(): boolean {
     return this.state === BossState.FIRING_LASER

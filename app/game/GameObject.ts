@@ -56,6 +56,9 @@ export abstract class GameObject {
   /** 生存フラグ（false → GameManagerが次フレームで削除） */
   public isAlive: boolean
 
+  /** 死亡演出中フラグ（true → 判定や行動は停止するが描画は継続） */
+  public isDying: boolean = false
+
   constructor(x: number = 0, y: number = 0) {
     this.position = { x, y }
     this.velocity = { x: 0, y: 0 }

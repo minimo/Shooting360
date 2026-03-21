@@ -68,6 +68,8 @@ export class GameManager {
   // Wave アナウンス（Vue に公開）
   public announcementText: string = ''
   public announcementAlpha: number = 0
+  public bossWarningText: string = ''
+  public isBossWarningActive: boolean = false
 
   // Wave 管理
   public currentWave: number = 0
@@ -1003,6 +1005,10 @@ export class GameManager {
         (ex, ey, ea) => this.spawnBullet(ex, ey, ea, 'enemy'),
         (obj) => this.addObject(obj),
         this.currentWave,
+        (text, active) => {
+          this.bossWarningText = text
+          this.isBossWarningActive = active
+        }
       )
       this.addObject(boss)
       for (let i = 0; i < 4; i++) {
@@ -1065,7 +1071,7 @@ export class GameManager {
     ) as Bullet[]
     const enemies = this.objects.filter(
       (obj) =>
-        (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer || obj instanceof CoreShield) && obj.isAlive,
+        (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer || obj instanceof CoreShield) && obj.isAlive && !obj.isDying,
     ) as (Fighter | MissileFlower | CoreDestroyer | CoreShield)[]
 
     // レーザー vs 敵機
@@ -1095,9 +1101,11 @@ export class GameManager {
             enemy.velocity.x,
             enemy.velocity.y,
           )
-          if (!enemy.isAlive) {
+          const justDied = !enemy.isAlive || (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
+          if (justDied) {
             if (enemy instanceof CoreDestroyer) {
-              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+              enemy.isDying = true
+              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
             } else {
               this.spawnDestructionEffect(
                 enemy.position.x,
@@ -1123,7 +1131,13 @@ export class GameManager {
                   this.spawnHitEffect(bullet.position.x, bullet.position.y, 0xffffff, bullet.velocity.x, bullet.velocity.y)
                   this.addScore(10)
                   if (!enemy.isAlive) {
-                      this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                      if (enemy instanceof CoreDestroyer) {
+                          // CoreShieldがCoreDestroyerになることは通常ないが、防衛的に
+                          enemy.isDying = true
+                          this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
+                      } else {
+                          this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                      }
                       this.addScore(1000)
                   }
                   if (!bullet.isPiercing) break
@@ -1141,9 +1155,11 @@ export class GameManager {
               bullet.velocity.y,
             )
             this.addScore(10)
-            if (!enemy.isAlive) {
+            const justDied = !enemy.isAlive || (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
+            if (justDied) {
               if (enemy instanceof CoreDestroyer) {
-                this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+                enemy.isDying = true
+                this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
               } else {
                 this.spawnDestructionEffect(
                   enemy.position.x,
@@ -1303,7 +1319,12 @@ export class GameManager {
                 enemy.takeDamage(ex.damage)
                 this.spawnHitEffect(enemy.position.x, enemy.position.y, 0xffaa00, 0, 0)
                 if (!enemy.isAlive) {
-                    this.spawnDestructionEffect(enemy.position.x, enemy.position.y, 0, 0)
+                    if (enemy instanceof CoreDestroyer) {
+                        enemy.isDying = true
+                        this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
+                    } else {
+                        this.spawnDestructionEffect(enemy.position.x, enemy.position.y, 0, 0)
+                    }
                     this.addScore(1000)
                 }
             }
@@ -1319,9 +1340,11 @@ export class GameManager {
               enemy.velocity.x,
               enemy.velocity.y,
             )
-            if (!enemy.isAlive) {
+            const justDied = !enemy.isAlive || (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
+            if (justDied) {
               if (enemy instanceof CoreDestroyer) {
-                this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+                enemy.isDying = true
+                this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
               } else {
                 this.spawnDestructionEffect(
                   enemy.position.x,
@@ -1364,7 +1387,12 @@ export class GameManager {
                 this.spawnHitEffect(hl.position.x, hl.position.y, 0xffff00, hl.velocity.x, hl.velocity.y)
                 hl.isAlive = false
                 if (!enemy.isAlive) {
-                    this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                    if (enemy instanceof CoreDestroyer) {
+                        enemy.isDying = true
+                        this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
+                    } else {
+                        this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                    }
                     this.addScore(1000)
                 }
                 break
@@ -1381,9 +1409,11 @@ export class GameManager {
             hl.velocity.y,
           )
           hl.isAlive = false
-          if (!enemy.isAlive) {
+          const justDied = !enemy.isAlive || (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
+          if (justDied) {
             if (enemy instanceof CoreDestroyer) {
-              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }))
+              enemy.isDying = true
+              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
             } else {
               this.spawnDestructionEffect(
                 enemy.position.x,

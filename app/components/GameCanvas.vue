@@ -34,6 +34,16 @@
       {{ announcementText }}
     </div>
 
+    <!-- ボス警告表示 -->
+    <transition name="warning-fade">
+      <div v-if="isBossWarningActive" class="boss-warning-overlay">
+        <div class="boss-warning-content">
+          <div class="warning-label">WARNING</div>
+          <div class="warning-countdown">{{ bossWarningText.replace('WARNING ', '') }}</div>
+        </div>
+      </div>
+    </transition>
+
     <!-- タイトル画面 -->
     <div v-if="showOverlay" class="overlay">
       <div class="overlay-content">
@@ -220,6 +230,8 @@ const scoreRaw = ref(0)
 const powerUpListText = ref('')
 const announcementText = ref('')
 const announcementAlpha = ref(0)
+const bossWarningText = ref('')
+const isBossWarningActive = ref(false)
 const isKeyHeldOnPowerUpShow = ref(false)
 
 const isHudVisible = computed(() => !showOverlay.value && !showDebugMenu.value)
@@ -286,6 +298,8 @@ const gameLoop = (time: number) => {
   powerUpListText.value = gm.powerUpListEntries.join(' / ')
   announcementText.value = gm.announcementText
   announcementAlpha.value = gm.announcementAlpha
+  bossWarningText.value = gm.bossWarningText
+  isBossWarningActive.value = gm.isBossWarningActive
 
   showPowerUp.value = gm.isPowerUpSelecting
   if (showPowerUp.value) powerUpOptions.value = gm.currentPowerUpOptions
@@ -701,6 +715,60 @@ onUnmounted(() => {
   text-align: center;
   pointer-events: none;
   white-space: nowrap;
+}
+
+/* ボス警告オーバーレイ */
+.boss-warning-overlay {
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.boss-warning-content {
+  text-align: center;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.warning-label {
+  font-size: 40px;
+  font-weight: 900;
+  color: #ff3333;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.8rem;
+  margin-bottom: 10px;
+}
+
+.warning-countdown {
+  font-size: 60px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  margin-top: -5px;
+}
+
+@keyframes warning-bg-flash {
+  0% { opacity: 0.3; }
+  50% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+@keyframes warning-text-pulse {
+  from { transform: scale(1); filter: brightness(1); }
+  to { transform: scale(1.05); filter: brightness(1.5); }
+}
+
+.warning-fade-enter-active, .warning-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.warning-fade-enter-from, .warning-fade-leave-to {
+  opacity: 0;
 }
 
 /* オーバーレイ共通 */

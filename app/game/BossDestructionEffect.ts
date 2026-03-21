@@ -8,16 +8,19 @@ export class BossDestructionEffect extends GameObject {
   private hasTriggeredMassive: boolean = false
   private spawnObject: (obj: GameObject) => void
   private shakeCamera: (frames: number) => void
+  private onComplete: () => void
 
   constructor(
     x: number,
     y: number,
     spawnObject: (obj: GameObject) => void,
-    shakeCamera: (frames: number) => void
+    shakeCamera: (frames: number) => void,
+    onComplete: () => void
   ) {
     super(x, y)
     this.spawnObject = spawnObject
     this.shakeCamera = shakeCamera
+    this.onComplete = onComplete
     // 最初の小揺れ
     this.shakeCamera(10)
   }
@@ -68,6 +71,7 @@ export class BossDestructionEffect extends GameObject {
     this.timer -= delta
     if (this.timer <= 0) {
       this.isAlive = false
+      this.onComplete()
     }
   }
 }

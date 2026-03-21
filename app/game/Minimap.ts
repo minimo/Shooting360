@@ -1,8 +1,10 @@
 import type { Player } from './Player'
-import type { GameObject } from './GameObject'
+import { GameObject, WORLD_SIZE } from './GameObject'
 import { Bullet } from './Bullet'
 import { Fighter } from './Enemy/Fighter'
+import { AceFighter } from './Enemy/AceFighter'
 import { MissileFlower } from './Enemy/MissileFlower'
+import { CoreDestroyer } from './Enemy/CoreDestroyer'
 import { HomingMissile } from './HomingMissile'
 
 export interface MinimapDot {
@@ -36,7 +38,7 @@ export class Minimap {
       let dx = x - pX
       let dy = y - pY
 
-      const worldSize = 4000 // GameObject.WORLD_SIZE
+      const worldSize = WORLD_SIZE
       const halfSize = worldSize / 2
 
       if (dx > halfSize) dx -= worldSize
@@ -74,10 +76,19 @@ export class Minimap {
 
     // 敵機
     for (const obj of objects) {
-      if ((obj instanceof Fighter || obj instanceof MissileFlower) && obj.isAlive) {
+      if (!obj.isAlive || obj.isDying) continue
+
+      if (obj instanceof CoreDestroyer) {
         const { nx, ny } = toRelativeNorm(obj.position.x, obj.position.y)
         if (inCircle(nx, ny)) {
-          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: '#ff3333', size: 4 })
+          // ボスは大きく表示
+          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: '#ff0000', size: 8 })
+        }
+      } else if (obj instanceof Fighter || obj instanceof AceFighter || obj instanceof MissileFlower) {
+        const { nx, ny } = toRelativeNorm(obj.position.x, obj.position.y)
+        if (inCircle(nx, ny)) {
+          const isAce = obj instanceof AceFighter
+          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: isAce ? '#ffaa00' : '#ff3333', size: isAce ? 5 : 4 })
         }
       }
     }
