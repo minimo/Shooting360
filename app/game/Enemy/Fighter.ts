@@ -15,7 +15,7 @@ export class Fighter extends GameObject {
   public fireInterval: number = 60
   protected fireCooldown: number = 0
   private offsetSign: number = Math.random() < 0.5 ? 1 : -1
-  public hp: number = 1
+  public hp: number = 10
   protected player: Player
   private spawnBullet: SpawnBulletFn
   private isEvading: boolean = false

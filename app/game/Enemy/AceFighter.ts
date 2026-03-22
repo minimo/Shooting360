@@ -12,7 +12,7 @@ import type { Player, SpawnBulletFn, SpawnAfterimageFn } from '../Player'
 export class AceFighter extends Fighter {
   public override speed: number = 16.8
   public override rotationSpeed: number = 0.15
-  public override hp: number = 5
+  public override hp: number = 50
   public override fireInterval: number = 60
 
   public isRepositioning: boolean = false

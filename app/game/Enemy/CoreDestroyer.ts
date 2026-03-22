@@ -12,8 +12,8 @@ export enum BossState {
  * Wave 5 Boss: Galaxy Core (Core Destroyer)
  */
 export class CoreDestroyer extends GameObject {
-  public hp: number = 300
-  public maxHp: number = 300
+  public hp: number = 900
+  public maxHp: number = 900
   private player: Player
   private spawnBullet: SpawnBulletFn
   private addObject: (obj: GameObject) => void
@@ -86,7 +86,7 @@ export class CoreDestroyer extends GameObject {
     this.wave = wave
     this.setWarning = setWarning
     
-    this.maxHp = 1200 + (wave - 5) * 400
+    this.maxHp = 3600 + (wave - 5) * 1200
     this.hp = this.maxHp
     
     this.createMesh()

@@ -5,8 +5,8 @@ import { CoreDestroyer } from './CoreDestroyer'
 export class CoreShield extends GameObject {
   public boss: CoreDestroyer
   public shieldIndex: number
-  public maxHp: number = 300
-  public hp: number = 300
+  public maxHp: number = 720
+  public hp: number = 720
   public override radius: number = 70 // Boxの長辺の半分に近い値
   public override side: 'enemy' = 'enemy'
   
@@ -17,6 +17,10 @@ export class CoreShield extends GameObject {
     super(0, 0)
     this.boss = boss
     this.shieldIndex = shieldIndex
+
+    // ボス本体の耐久値の5分の1を装甲板の耐久値とする
+    this.maxHp = Math.round(boss.maxHp / 5)
+    this.hp = this.maxHp
 
     const geo = new THREE.BoxGeometry(140, 40, 60)
     const mat = new THREE.MeshStandardMaterial({
