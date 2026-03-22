@@ -431,7 +431,9 @@ watch(showPowerUp, (val) => {
 })
 
 watch(isPaused, (val) => {
-  if (val) {
+  // 強化画面、ゲームオーバー、タイトル画面（Overlay）が表示されていない場合のみポーズ画面を出す
+  const anyOverlayActive = showPowerUp.value || showGameOver.value || showOverlay.value || showDebugMenu.value
+  if (val && !anyOverlayActive) {
     pauseScreen?.show()
   } else {
     pauseScreen?.hide()
