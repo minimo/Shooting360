@@ -396,30 +396,7 @@ const handlePowerUpKey = (e: KeyboardEvent) => {
 
 // handlePowerUpKeyUp は不要になった（isKeyHeldOnPowerUpShow廃止）
 
-const handlePointerMove = (e: MouseEvent) => {
-  if (!showPowerUp.value || !powerUpScreen || !gameContainer.value) return
-  const rect = gameContainer.value.getBoundingClientRect()
-  const scale = rect.width / GAME_WIDTH
-  const displayX = e.clientX - rect.left
-  const displayY = e.clientY - rect.top
-  
-  const sceneX = displayX / scale - GAME_WIDTH / 2
-  // OrthographicCamera: +Y is Up
-  const sceneY = -(displayY / scale - GAME_HEIGHT / 2)
 
-  const hitIndex = powerUpScreen.hitTestCard(sceneX, sceneY)
-  if (hitIndex !== -1) {
-    selectedIndex.value = hitIndex
-    powerUpScreen.setSelectedIndex(hitIndex)
-  }
-}
-
-const handlePointerDown = (e: MouseEvent) => {
-  if (!showPowerUp.value) return
-  if (e.button !== 0) return 
-  handlePointerMove(e)
-  selectPowerUp(selectedIndex.value)
-}
 
 const handlePauseKey = (e: KeyboardEvent) => {
   if (showOverlay.value || showGameOver.value || showPowerUp.value) return
@@ -446,13 +423,9 @@ watch(showPowerUp, (val) => {
     const wave = gameManager.value?.currentWave ?? 0
     powerUpScreen?.show(options, reason, wave)
     window.addEventListener('keydown', handlePowerUpKey)
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerdown', handlePointerDown)
   } else {
     powerUpScreen?.hide()
     window.removeEventListener('keydown', handlePowerUpKey)
-    window.removeEventListener('pointermove', handlePointerMove)
-    window.removeEventListener('pointerdown', handlePointerDown)
   }
 })
 
@@ -572,7 +545,6 @@ onUnmounted(() => {
   top: 50%;
   left: 50%;
   transform-origin: center center;
-  cursor: none;
 }
 
 .game-container canvas {
