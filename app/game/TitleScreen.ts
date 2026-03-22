@@ -51,23 +51,23 @@ export class TitleScreen {
     const UI_SCALE = 1.25
 
     // --- タイトル ---
-    this.titleSprite = this.createSprite(800, 120, UI_SCALE)
-    this.titleSprite.position.set(0, 200 * UI_SCALE, TEXT_Z)
+    this.titleSprite = this.createSprite(1200, 200, UI_SCALE)
+    this.titleSprite.position.set(0, 240 * UI_SCALE, TEXT_Z)
     this.group.add(this.titleSprite)
 
     // --- サブタイトル ---
-    this.subtitleSprite = this.createSprite(700, 50, UI_SCALE)
-    this.subtitleSprite.position.set(0, 115 * UI_SCALE, TEXT_Z)
+    this.subtitleSprite = this.createSprite(1000, 80, UI_SCALE)
+    this.subtitleSprite.position.set(0, 120 * UI_SCALE, TEXT_Z)
     this.group.add(this.subtitleSprite)
 
     // --- スタートヒント ---
-    this.hintSprite = this.createSprite(500, 60, UI_SCALE)
-    this.hintSprite.position.set(0, 20 * UI_SCALE, TEXT_Z)
+    this.hintSprite = this.createSprite(700, 100, UI_SCALE)
+    this.hintSprite.position.set(0, -10 * UI_SCALE, TEXT_Z)
     this.group.add(this.hintSprite)
 
     // --- コントロール説明 ---
-    this.controlsSprite = this.createSprite(620, 200, UI_SCALE)
-    this.controlsSprite.position.set(0, -160 * UI_SCALE, TEXT_Z)
+    this.controlsSprite = this.createSprite(800, 280, UI_SCALE)
+    this.controlsSprite.position.set(0, -220 * UI_SCALE, TEXT_Z)
     this.group.add(this.controlsSprite)
 
     // 最初は非表示
@@ -117,7 +117,7 @@ export class TitleScreen {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     const text = 'SHOOTING 360'
-    const fontSize = 112
+    const fontSize = 160
     ctx.font = `bold ${fontSize}px Orbitron, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -152,7 +152,7 @@ export class TitleScreen {
     const ctx = canvas.getContext('2d')!
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    ctx.font = 'bold 36px Orbitron, sans-serif'
+    ctx.font = 'bold 50px Orbitron, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.letterSpacing = '8px'
@@ -172,7 +172,7 @@ export class TitleScreen {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     ctx.globalAlpha = alpha
-    ctx.font = 'bold 46px Orbitron, sans-serif'
+    ctx.font = 'bold 64px Orbitron, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.shadowColor = 'rgba(255, 255, 255, 0.5)'
@@ -215,15 +215,15 @@ export class TitleScreen {
       const y = 20 + lineH * i + lineH / 2
 
       // アイコン
-      ctx.font = 'bold 30px Orbitron, sans-serif'
+      ctx.font = 'bold 44px Orbitron, sans-serif'
       ctx.textAlign = 'left'
       ctx.fillStyle = '#66ccff'
-      ctx.fillText(line.icon, 50, y)
+      ctx.fillText(line.icon, 80, y)
 
       // 説明
-      ctx.font = '28px Orbitron, sans-serif'
+      ctx.font = '40px Orbitron, sans-serif'
       ctx.fillStyle = '#aaddff'
-      ctx.fillText(line.desc, 180, y)
+      ctx.fillText(line.desc, 240, y)
     })
 
     this.markNeedsUpdate(this.controlsSprite)
