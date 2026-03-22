@@ -5,9 +5,9 @@ const OVERLAY_Z = 500
 const TEXT_Z = 501
 
 // カード配置設定
-const CARD_W = 340
-const CARD_H = 390
-const CARD_GAP = 30
+const CARD_W = 380
+const CARD_H = 460
+const CARD_GAP = 20
 
 /**
  * パワーアップ選択画面をThree.jsシーン内で描画するクラス
@@ -59,11 +59,11 @@ export class PowerUpScreen {
     this.overlayMesh.position.set(0, 0, OVERLAY_Z)
     this.group.add(this.overlayMesh)
 
-    const UI_SCALE = 1.25
+    const UI_SCALE = 1.15
 
     // タイトルSprite
-    this.titleSprite = this.createSprite(700, 90, UI_SCALE)
-    this.titleSprite.position.set(0, 280 * UI_SCALE, TEXT_Z)
+    this.titleSprite = this.createSprite(1000, 110, UI_SCALE)
+    this.titleSprite.position.set(0, 300 * UI_SCALE, TEXT_Z)
     this.group.add(this.titleSprite)
 
     this.group.visible = false
@@ -108,7 +108,7 @@ export class PowerUpScreen {
     this.cardBounds = []
     this.skipBounds = null
 
-    const UI_SCALE = 1.25
+    const UI_SCALE = 1.15
     // メインカードを中央配置
     const n = this.mainOptions.length
     const totalW = n * CARD_W + (n - 1) * CARD_GAP
@@ -132,16 +132,16 @@ export class PowerUpScreen {
 
     // スキップボタン
     if (this.skipOption) {
-      const sprite = this.createSprite(340, 60, UI_SCALE)
-      const y = (baseCardY - CARD_H / 2 - 55) * UI_SCALE
+      const sprite = this.createSprite(380, 68, UI_SCALE)
+      const y = (baseCardY - CARD_H / 2 - 60) * UI_SCALE
       sprite.position.set(0, y, TEXT_Z)
       this.group.add(sprite)
       this.skipSprite = sprite
       this.skipBounds = {
-        x: -170 * UI_SCALE,
-        y: y - (60 * UI_SCALE) / 2,
-        w: 340 * UI_SCALE,
-        h: 60 * UI_SCALE,
+        x: -190 * UI_SCALE,
+        y: y - (68 * UI_SCALE) / 2,
+        w: 380 * UI_SCALE,
+        h: 68 * UI_SCALE,
       }
     }
   }
@@ -157,7 +157,7 @@ export class PowerUpScreen {
         ? 'LEVEL UP!'
         : `WAVE ${this.currentWave} CLEAR!`
 
-    ctx.font = 'bold 118px Orbitron, sans-serif'
+    ctx.font = 'bold 140px Orbitron, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.shadowColor = 'rgba(255,255,0,0.7)'
@@ -196,68 +196,79 @@ export class PowerUpScreen {
     ctx.stroke()
     ctx.shadowBlur = 0
 
-    // レアリティ星
+    // --- コンテンツの配置（中央寄せ） ---
     const rarity = option.rarity ?? 0
+    const maxLv = option.maxLevel ?? 1
+    const curLv = option.currentLevel ?? 0
+    
+    // 全体の高さを概算して開始位置を決定
+    let totalContentHeight = 0
+    if (rarity > 0) totalContentHeight += 80
+    totalContentHeight += 100 // 名前
+    if (maxLv > 1) totalContentHeight += 100 // バッジ
+    totalContentHeight += 140 // 説明文の概算
+
+    let currentY = (ch - totalContentHeight) / 2
+
+    // レアリティ星
     if (rarity > 0) {
-      ctx.font = '36px serif'
+      ctx.font = '56px serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
       ctx.fillStyle = '#ffd700'
       ctx.shadowColor = 'rgba(255,215,0,0.6)'
       ctx.shadowBlur = 8
-      ctx.fillText('★'.repeat(rarity), cw / 2, 22)
+      ctx.fillText('★'.repeat(rarity), cw / 2, currentY)
       ctx.shadowBlur = 0
+      currentY += 80
     }
 
     // 名前
-    ctx.font = 'bold 44px Orbitron, sans-serif'
+    ctx.font = 'bold 64px Orbitron, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
     ctx.fillStyle = '#00ffcc'
     ctx.shadowBlur = 0
-    // テキストが長い場合は縮小
-    const nameY = rarity > 0 ? 70 : 36
     ctx.save()
     const nameMaxW = cw - 40
     const nameW = ctx.measureText(option.name).width
     if (nameW > nameMaxW) {
       ctx.scale(nameMaxW / nameW, 1)
-      ctx.fillText(option.name, (cw * nameW) / (2 * nameMaxW), nameY)
+      ctx.fillText(option.name, (cw * nameW) / (2 * nameMaxW), currentY)
     } else {
-      ctx.fillText(option.name, cw / 2, nameY)
+      ctx.fillText(option.name, cw / 2, currentY)
     }
     ctx.restore()
+    currentY += 100
 
     // レベルバッジ
-    const maxLv = option.maxLevel ?? 1
-    const curLv = option.currentLevel ?? 0
     if (maxLv > 1) {
       const badgeText = `Lv ${curLv}/${maxLv}`
-      ctx.font = 'bold 28px Orbitron, sans-serif'
+      ctx.font = 'bold 40px Orbitron, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      const badgeY = nameY + 56
-      const badgeW = ctx.measureText(badgeText).width + 24
-      const badgeH = 36
+      const badgeW = ctx.measureText(badgeText).width + 36
+      const badgeH = 50
       const badgeX = cw / 2 - badgeW / 2
       ctx.fillStyle = 'rgba(0,255,204,0.18)'
       ctx.strokeStyle = 'rgba(0,255,204,0.4)'
-      ctx.lineWidth = 1
+      ctx.lineWidth = 2
       ctx.beginPath()
-      ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 10)
+      ctx.roundRect(badgeX, currentY, badgeW, badgeH, 14)
       ctx.fill()
       ctx.stroke()
       ctx.fillStyle = '#00ffcc'
-      ctx.fillText(badgeText, cw / 2, badgeY + 4)
+      ctx.fillText(badgeText, cw / 2, currentY + 6)
+      currentY += 100
     }
 
     // 説明テキスト（折り返し）
-    ctx.font = '30px Orbitron, sans-serif'
+    currentY += 40 // バッジ/名前からしっかり余白を開ける
+    ctx.font = '44px Orbitron, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
     ctx.fillStyle = '#eeeeee'
-    const descY = ch - 190
-    this.wrapText(ctx, option.description, cw / 2, descY, cw - 40, 38)
+    this.wrapText(ctx, option.description, cw / 2, currentY, cw - 50, 52)
 
     this.markNeedsUpdate(sprite)
   }
@@ -290,7 +301,7 @@ export class PowerUpScreen {
     ctx.stroke()
     ctx.shadowBlur = 0
 
-    ctx.font = 'bold 36px Orbitron, sans-serif'
+    ctx.font = 'bold 44px Orbitron, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillStyle = isSelected ? '#ffffff' : '#aaaaaa'
