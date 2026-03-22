@@ -74,12 +74,40 @@
     </div>
 
     <!-- ゲームオーバー -->
-    <div v-if="showGameOver" class="overlay">
-      <div class="overlay-content">
+    <div v-if="showGameOver" class="overlay game-over-overlay">
+      <div class="overlay-content game-over-content">
         <h2 class="game-over-text">GAME OVER</h2>
-        <p>Your ship was destroyed.</p>
-        <div class="controls">
-          <p style="font-size: 1.2rem; margin: 0; color: #fff;">Z / X キーでリスタート</p>
+
+        <!-- リザルト -->
+        <div class="game-over-result">
+          <div class="result-row">
+            <span class="result-label">WAVE</span>
+            <span class="result-value">{{ gameOverWaveDisplay }}</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">SCORE</span>
+            <span class="result-value">{{ gameOverScoreDisplay }}</span>
+          </div>
+        </div>
+
+        <!-- ボタン -->
+        <div class="game-over-buttons">
+          <button
+            class="game-over-btn"
+            :class="{ selected: selectedGameOverIndex === 0 }"
+            @click="onGameOverSelect(0)"
+            @mouseenter="selectedGameOverIndex = 0"
+          >
+            ▶ コンティニュー
+          </button>
+          <button
+            class="game-over-btn"
+            :class="{ selected: selectedGameOverIndex === 1 }"
+            @click="onGameOverSelect(1)"
+            @mouseenter="selectedGameOverIndex = 1"
+          >
+            ⏎ タイトルに戻る
+          </button>
         </div>
       </div>
     </div>
@@ -245,6 +273,10 @@ const isBossWarningActive = ref(false)
 const isBossActive = ref(false)
 const bossHpPercent = ref(0)
 const isKeyHeldOnPowerUpShow = ref(false)
+// ゲームオーバー画面用
+const selectedGameOverIndex = ref(0)
+const gameOverWaveDisplay = ref(0)
+const gameOverScoreDisplay = ref('000000')
 
 const isHudVisible = computed(() => !showOverlay.value && !showDebugMenu.value)
 const scoreDisplay = computed(() => scoreRaw.value.toString().padStart(6, '0'))
@@ -282,8 +314,12 @@ const gameLoop = (time: number) => {
   if (!gm || !renderer || !scene || !camera) return
 
   if (gm.isGameOver && !showGameOver.value) {
+    // リザルトをラッチ
+    gameOverWaveDisplay.value = gm.gameOverWave
+    gameOverScoreDisplay.value = gm.score.toString().padStart(6, '0')
     showGameOver.value = true
-    setTimeout(() => window.addEventListener('keydown', restartOnKey), 500)
+    selectedGameOverIndex.value = 0
+    setTimeout(() => window.addEventListener('keydown', handleGameOverKey), 500)
   }
 
   const effectiveInput =
@@ -389,18 +425,37 @@ const startOnKey = (e: KeyboardEvent) => {
   }
 }
 
-const restartOnKey = async () => {
+// ゲームオーバー画面でのキー操作
+const handleGameOverKey = (e: KeyboardEvent) => {
+  if (!showGameOver.value) return
+  const key = e.key.toLowerCase()
+  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+    selectedGameOverIndex.value = (selectedGameOverIndex.value - 1 + 2) % 2
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+    selectedGameOverIndex.value = (selectedGameOverIndex.value + 1) % 2
+  } else if (key === 'z' || key === 'x' || key === 'enter') {
+    onGameOverSelect(selectedGameOverIndex.value)
+  }
+}
+
+// コンティニュー / タイトルに戻る の処理
+const onGameOverSelect = async (index: number) => {
   if (!showGameOver.value || !gameManager.value || !scene) return
   showGameOver.value = false
-  window.removeEventListener('keydown', restartOnKey)
+  window.removeEventListener('keydown', handleGameOverKey)
 
-  // シーンをクリア（背景色オブジェクト以外を削除）
-  while (scene.children.length > 0) scene.remove(scene.children[0]!)
-
-  gameManager.value.destroy()
-  gameManager.value = new GameManager()
-  await gameManager.value.init(scene, GAME_WIDTH, GAME_HEIGHT)
-  gameManager.value.isGameActive = true
+  if (index === 0) {
+    // ---- コンティニュー ----
+    await gameManager.value.continueGame(scene, GAME_WIDTH, GAME_HEIGHT)
+  } else {
+    // ---- タイトルに戻る ----
+    while (scene.children.length > 0) scene.remove(scene.children[0]!)
+    gameManager.value.destroy()
+    gameManager.value = new GameManager()
+    await gameManager.value.init(scene, GAME_WIDTH, GAME_HEIGHT)
+    showOverlay.value = true
+    window.addEventListener('keydown', startOnKey)
+  }
 }
 
 const selectPowerUp = (index: number) => {
@@ -610,7 +665,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (animationId !== null) cancelAnimationFrame(animationId)
   window.removeEventListener('keydown', startOnKey)
-  window.removeEventListener('keydown', restartOnKey)
+  window.removeEventListener('keydown', handleGameOverKey)
   window.removeEventListener('keydown', handlePauseKey)
   window.removeEventListener('blur', handleBlur)
   window.removeEventListener('resize', fitCanvas)
@@ -1102,6 +1157,94 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.1);
   box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
   transform: scale(1.05);
+}
+
+/* ゲームオーバー専用スタイル */
+.game-over-overlay {}
+
+.game-over-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.game-over-result {
+  margin: 1.5rem 0 2rem;
+  padding: 1.5rem 3rem;
+  background: rgba(255, 50, 50, 0.08);
+  border: 1px solid rgba(255, 80, 80, 0.25);
+  border-radius: 12px;
+  min-width: 340px;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.result-row:last-child {
+  border-bottom: none;
+}
+
+.result-label {
+  font-size: 1rem;
+  color: #aaa;
+  letter-spacing: 0.2rem;
+}
+
+.result-value {
+  font-size: 1.6rem;
+  color: #fff;
+  font-weight: bold;
+  letter-spacing: 0.1rem;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.game-over-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 340px;
+}
+
+.game-over-btn {
+  width: 100%;
+  padding: 1rem 2rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 0.15rem;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.game-over-btn:hover,
+.game-over-btn.selected {
+  color: #fff;
+  transform: scale(1.03);
+}
+
+.game-over-btn:first-child:hover,
+.game-over-btn:first-child.selected {
+  background: rgba(0, 220, 120, 0.15);
+  border-color: #00dc78;
+  box-shadow: 0 0 20px rgba(0, 220, 120, 0.4);
+  text-shadow: 0 0 10px rgba(0, 220, 120, 0.6);
+}
+
+.game-over-btn:last-child:hover,
+.game-over-btn:last-child.selected {
+  background: rgba(180, 180, 255, 0.1);
+  border-color: rgba(180, 180, 255, 0.5);
+  box-shadow: 0 0 15px rgba(180, 180, 255, 0.3);
 }
 
 /* ポーズ */

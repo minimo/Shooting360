@@ -55,6 +55,8 @@ export class GameManager {
   public isGameOver: boolean = false
   private gameOverTimer: number = 0
   private hasTriggeredMassiveExplosion: boolean = false
+  /** ゲームオーバー時のWave番号（コンティニュー用） */
+  public gameOverWave: number = 0
 
   // スコア・レベル（Vue に公開）
   public score: number = 0
@@ -790,6 +792,7 @@ export class GameManager {
           this.hasTriggeredMassiveExplosion = true
         }
       } else {
+        this.gameOverWave = this.currentWave
         this.isGameOver = true
         return
       }
@@ -1648,6 +1651,40 @@ export class GameManager {
     }
     this.objects.forEach((obj) => obj.destroy())
     this.objects = []
+  }
+
+  /**
+   * コンティニュー：強化状態を引き継いでゲームオーバーしたWaveから再開する
+   */
+  public async continueGame(scene: THREE.Scene, screenWidth: number, screenHeight: number): Promise<void> {
+    // 引き継ぐ情報を保存
+    const savedWave = this.gameOverWave
+    const savedPowerUpLevels = { ...this.powerUpLevels }
+    const savedRarityBonus = this.rarityBonus
+    const savedScore = this.score
+
+    // シーンとオブジェクトをクリアしてから再初期化
+    this.destroy()
+    await this.init(scene, screenWidth, screenHeight)
+
+    // スコア・レアリティボーナスを復元
+    this.score = savedScore
+    this.rarityBonus = savedRarityBonus
+
+    // 強化状態を復元（effectを再適用）
+    for (const [id, level] of Object.entries(savedPowerUpLevels)) {
+      const powerUp = this.availablePowerUps.find((p) => p.id === id)
+      if (powerUp && level > 0) {
+        for (let i = 0; i < level; i++) powerUp.effect(this)
+        this.powerUpLevels[id] = level
+      }
+    }
+    this.updatePowerUpListEntries()
+
+    // 指定Waveから開始（nextWave()の呼び出しを抑制するためwaveを直接設定）
+    this.currentWave = savedWave - 1
+    this.nextWave()
+    this.isGameActive = true
   }
 
   private cleanup(): void {
