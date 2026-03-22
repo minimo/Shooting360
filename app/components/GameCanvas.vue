@@ -2,170 +2,9 @@
   <div class="game-wrapper">
     <div ref="gameContainer" class="game-container" />
 
-    <!-- HUD（ゲームプレイ中のみ表示） -->
-    <div v-if="isHudVisible" class="hud">
-      <!-- スコア・Wave・レベル -->
-      <div class="score-area">
-        <div class="score-line">WAVE {{ currentWave }}&nbsp;&nbsp;SCORE: {{ scoreDisplay }}</div>
-        <div class="level-line">Lv.{{ playerLevel }} (NEXT: {{ scoreForNextPowerUp }})</div>
-        <div v-if="powerUpListText" class="powerup-list">{{ powerUpListText }}</div>
-      </div>
+    <!-- HUD・アナウンス・ボス警告・パワーアップ・ポーズはThree.jsシーン内で描画 -->
 
-      <!-- HP ゲージ -->
-      <div class="hp-bar-wrapper">
-        <div class="hp-bar-track">
-          <div
-            class="hp-bar-fill"
-            :style="{ width: hpPercent + '%', background: hpBarColor }"
-          />
-        </div>
-        <!-- ボス HP ゲージ (プレイヤーゲージのすぐ下に表示) -->
-        <div v-if="isBossActive" class="boss-hp-bar-outer">
-          <div class="boss-label">BOSS</div>
-          <div class="boss-hp-bar-track">
-            <div
-              class="boss-hp-bar-fill"
-              :style="{ width: bossHpPercent + '%' }"
-            />
-          </div>
-        </div>
-      </div>
 
-      <!-- ミニマップ -->
-      <canvas ref="minimapCanvas" class="minimap" :width="MINIMAP_SIZE" :height="MINIMAP_SIZE" />
-    </div>
-
-    <!-- Wave アナウンス -->
-    <div
-      v-if="announcementText"
-      class="announcement"
-      :style="{ opacity: announcementAlpha }"
-    >
-      {{ announcementText }}
-    </div>
-
-    <!-- ボス警告表示 -->
-    <transition name="warning-fade">
-      <div v-if="isBossWarningActive" class="boss-warning-overlay">
-        <div class="boss-warning-content">
-          <div class="warning-label">WARNING</div>
-          <div class="warning-countdown">{{ bossWarningText.replace('WARNING ', '') }}</div>
-        </div>
-      </div>
-    </transition>
-
-    <!-- タイトル画面 -->
-    <div v-if="showOverlay" class="overlay">
-      <div class="overlay-content">
-        <div class="title-container">
-          <h1 class="glitch-title" data-text="SHOOTING 360">SHOOTING 360</h1>
-          <div class="subtitle">OMNIDIRECTIONAL 2D SHOOTING</div>
-        </div>
-        <p class="start-hint">PRESS Z / X TO START</p>
-        <div class="controls">
-          <ul>
-            <li>⬅️➡️: 回転</li>
-            <li>⬆️: 前進加速 / ⬇️: 減速</li>
-            <li>Z: 弾丸発射</li>
-            <li>X: レーザー発射</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <!-- ゲームオーバー -->
-    <div v-if="showGameOver" class="overlay game-over-overlay">
-      <div class="overlay-content game-over-content">
-        <h2 class="game-over-text">GAME OVER</h2>
-
-        <!-- リザルト -->
-        <div class="game-over-result">
-          <div class="result-row">
-            <span class="result-label">WAVE</span>
-            <span class="result-value">{{ gameOverWaveDisplay }}</span>
-          </div>
-          <div class="result-row">
-            <span class="result-label">SCORE</span>
-            <span class="result-value">{{ gameOverScoreDisplay }}</span>
-          </div>
-        </div>
-
-        <!-- ボタン -->
-        <div class="game-over-buttons">
-          <button
-            class="game-over-btn"
-            :class="{ selected: selectedGameOverIndex === 0 }"
-            @click="onGameOverSelect(0)"
-            @mouseenter="selectedGameOverIndex = 0"
-          >
-            ▶ コンティニュー
-          </button>
-          <button
-            class="game-over-btn"
-            :class="{ selected: selectedGameOverIndex === 1 }"
-            @click="onGameOverSelect(1)"
-            @mouseenter="selectedGameOverIndex = 1"
-          >
-            ⏎ タイトルに戻る
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- パワーアップ選択 -->
-    <div v-if="showPowerUp" class="overlay powerup-overlay">
-      <div class="overlay-content">
-        <h2 class="powerup-title">
-          <template v-if="gameManager?.powerUpReason === 'level'">LEVEL UP!</template>
-          <template v-else>WAVE {{ currentWave }} CLEAR!</template>
-        </h2>
-        <p class="powerup-subtitle">強化項目を選択してください</p>
-        <div class="powerup-options">
-          <div
-            v-for="(option, index) in mainPowerUpOptions"
-            :key="option.id"
-            class="powerup-card"
-            :class="{ selected: index === selectedIndex }"
-            @click="selectPowerUp(index)"
-            @mouseenter="selectedIndex = index"
-          >
-            <div v-if="option.rarity && option.rarity > 0" class="rarity-stars">
-              {{ '★'.repeat(option.rarity) }}
-            </div>
-            <h3>
-              {{ option.name }}
-              <span
-                class="level-badge"
-                :style="{
-                  visibility: option.maxLevel && option.maxLevel > 1 ? 'visible' : 'hidden',
-                }"
-              >
-                Lv {{ option.currentLevel || 0 }}/{{ option.maxLevel || 1 }}
-              </span>
-            </h3>
-            <p>{{ option.description }}</p>
-          </div>
-        </div>
-        <div v-if="skipPowerUpOption" class="powerup-skip-container">
-          <button
-            class="powerup-skip-button"
-            :class="{ selected: powerUpOptions.length - 1 === selectedIndex }"
-            @click="selectPowerUp(powerUpOptions.length - 1)"
-            @mouseenter="selectedIndex = powerUpOptions.length - 1"
-          >
-            {{ skipPowerUpOption.name }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ポーズ -->
-    <div v-if="isPaused && !showPowerUp" class="overlay pause-overlay">
-      <div class="overlay-content">
-        <h2 class="pause-title">PAUSE</h2>
-        <p>ESC キーで再開</p>
-      </div>
-    </div>
 
     <!-- デバッグメニュー -->
     <div v-if="showDebugMenu" class="overlay debug-overlay">
@@ -236,7 +75,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
+import { TitleScreen } from '~/game/TitleScreen'
+import { GameOverScreen } from '~/game/GameOverScreen'
+import { GameHUD } from '~/game/GameHUD'
+import { PowerUpScreen } from '~/game/PowerUpScreen'
+import { PauseScreen } from '~/game/PauseScreen'
 import * as THREE from 'three'
 import { GameManager } from '~/game/GameManager'
 import { useInput, type InputState } from '~/composables/useInput'
@@ -244,11 +88,9 @@ import { useInput, type InputState } from '~/composables/useInput'
 // --- CONSTANTS ---
 const GAME_WIDTH = 1920
 const GAME_HEIGHT = 1080
-const MINIMAP_SIZE = 240
 
 // --- REFS ---
 const gameContainer = ref<HTMLDivElement | null>(null)
-const minimapCanvas = ref<HTMLCanvasElement | null>(null)
 const showOverlay = ref(true)
 const showGameOver = ref(false)
 const showPowerUp = ref(false)
@@ -260,35 +102,14 @@ const powerUpOptions = ref<any[]>([])
 const availablePowerUps = ref<any[]>([])
 const debugPowerUpLevels = ref<Record<string, number>>({})
 const debugStartWave = ref(1)
-const currentWave = ref(0)
-const hpPercent = ref(100)
-const playerLevel = ref(0)
-const scoreForNextPowerUp = ref(1000)
-const scoreRaw = ref(0)
-const powerUpListText = ref('')
-const announcementText = ref('')
-const announcementAlpha = ref(0)
-const bossWarningText = ref('')
-const isBossWarningActive = ref(false)
-const isBossActive = ref(false)
-const bossHpPercent = ref(0)
-const isKeyHeldOnPowerUpShow = ref(false)
 // ゲームオーバー画面用
 const selectedGameOverIndex = ref(0)
 const gameOverWaveDisplay = ref(0)
 const gameOverScoreDisplay = ref('000000')
 
-const isHudVisible = computed(() => !showOverlay.value && !showDebugMenu.value)
-const scoreDisplay = computed(() => scoreRaw.value.toString().padStart(6, '0'))
+// ゲームプレイ中のみHUDを表示する内部フラグ
+const isHudVisible = () => !showOverlay.value && !showDebugMenu.value && !showGameOver.value
 
-const hpBarColor = computed(() => {
-  if (hpPercent.value < 30) return '#ff3333'
-  if (hpPercent.value < 50) return '#ffff00'
-  return '#00ff88'
-})
-
-const mainPowerUpOptions = computed(() => powerUpOptions.value.filter((opt) => opt.id !== 'skip'))
-const skipPowerUpOption = computed(() => powerUpOptions.value.find((opt) => opt.id === 'skip'))
 
 // --- Input ---
 const input = useInput()
@@ -300,6 +121,13 @@ let scene: THREE.Scene | null = null
 let camera: THREE.OrthographicCamera | null = null
 let animationId: number | null = null
 let lastTime: number = 0
+
+// --- オーバーレイ画面（Three.js描画） ---
+let titleScreen: TitleScreen | null = null
+let gameOverScreen: GameOverScreen | null = null
+let gameHUD: GameHUD | null = null
+let powerUpScreen: PowerUpScreen | null = null
+let pauseScreen: PauseScreen | null = null
 
 // --- Game Loop ---
 const gameLoop = (time: number) => {
@@ -314,13 +142,38 @@ const gameLoop = (time: number) => {
   if (!gm || !renderer || !scene || !camera) return
 
   if (gm.isGameOver && !showGameOver.value) {
-    // リザルトをラッチ
+    // リザルトをラッチしてThree.js画面を表示
     gameOverWaveDisplay.value = gm.gameOverWave
     gameOverScoreDisplay.value = gm.score.toString().padStart(6, '0')
     showGameOver.value = true
     selectedGameOverIndex.value = 0
+    gameOverScreen?.show(gm.gameOverWave, gm.score.toString().padStart(6, '0'))
     setTimeout(() => window.addEventListener('keydown', handleGameOverKey), 500)
   }
+
+  // Three.js画面の更新
+  titleScreen?.update(delta)
+  if (showGameOver.value) gameOverScreen?.update(delta)
+  if (showPowerUp.value) powerUpScreen?.update(delta)
+
+  // HUD更新（ゲームプレイ中のみ）
+  const hudVisible = isHudVisible()
+  gameHUD?.update({
+    wave: gm.currentWave,
+    score: gm.score,
+    playerLevel: gm.playerLevel,
+    scoreForNextPowerUp: gm.scoreForNextPowerUp,
+    powerUpListText: gm.powerUpListEntries.join(' / '),
+    hpPercent: gm.hpPercent,
+    isBossActive: gm.isBossActive,
+    bossHpPercent: gm.isBossActive ? (gm.bossHp / gm.bossMaxHp) * 100 : 0,
+    minimapDots: gm.minimapDots,
+    announcementText: gm.announcementText,
+    announcementAlpha: gm.announcementAlpha,
+    bossWarningText: gm.bossWarningText,
+    isBossWarningActive: gm.isBossWarningActive,
+    isVisible: hudVisible,
+  }, delta)
 
   const effectiveInput =
     showPowerUp.value || showOverlay.value || showGameOver.value
@@ -337,21 +190,7 @@ const gameLoop = (time: number) => {
 
   gm.update(delta, effectiveInput)
 
-  // Vue リアクティブ値の同期
-  currentWave.value = gm.currentWave
-  hpPercent.value = gm.hpPercent
-  playerLevel.value = gm.playerLevel
-  scoreForNextPowerUp.value = gm.scoreForNextPowerUp
-  scoreRaw.value = gm.score
-  powerUpListText.value = gm.powerUpListEntries.join(' / ')
-  announcementText.value = gm.announcementText
-  announcementAlpha.value = gm.announcementAlpha
-  bossWarningText.value = gm.bossWarningText
-  isBossWarningActive.value = gm.isBossWarningActive
-  
-  isBossActive.value = gm.isBossActive
-  bossHpPercent.value = gm.isBossActive ? (gm.bossHp / gm.bossMaxHp) * 100 : 0
-
+  // 内部状態の同期（デバッグメニュー等で使うもの）
   showPowerUp.value = gm.isPowerUpSelecting
   if (showPowerUp.value) powerUpOptions.value = gm.currentPowerUpOptions
   isPaused.value = gm.isPaused
@@ -360,52 +199,7 @@ const gameLoop = (time: number) => {
   camera.position.set(gm.shakeOffset.x, gm.shakeOffset.y, 100)
   camera.lookAt(gm.shakeOffset.x, gm.shakeOffset.y, 0)
 
-  // ミニマップ描画
-  drawMinimap(gm)
-
   renderer.render(scene, camera)
-}
-
-function drawMinimap(gm: GameManager): void {
-  const canvas = minimapCanvas.value
-  if (!canvas) return
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  ctx.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE)
-
-  const radius = (MINIMAP_SIZE / 2) * 0.9 // 少し内側に円を描画
-  const centerX = MINIMAP_SIZE / 2
-  const centerY = MINIMAP_SIZE / 2
-
-  // クリッピング設定（円形以外を描画しないようにする）
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
-  ctx.clip()
-
-  // 背景
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
-  ctx.fill()
-
-  // ドット描画
-  for (const dot of gm.minimapDots) {
-    const x = dot.nx * MINIMAP_SIZE
-    const y = dot.ny * MINIMAP_SIZE
-    ctx.fillStyle = dot.color
-    ctx.beginPath()
-    ctx.arc(x, y, dot.size / 2, 0, Math.PI * 2)
-    ctx.fill()
-  }
-
-  ctx.restore()
-
-  // 枠（クリッピングの外側に描画）
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.arc(centerX, centerY, radius - 1, 0, Math.PI * 2)
-  ctx.stroke()
 }
 
 // --- キーハンドラー ---
@@ -414,10 +208,12 @@ const startOnKey = (e: KeyboardEvent) => {
   const key = e.key.toLowerCase()
   if (key === 'z' || key === 'x') {
     showOverlay.value = false
+    titleScreen?.hide()
     gameManager.value.isGameActive = true
     window.removeEventListener('keydown', startOnKey)
   } else if (key === 'q') {
     showOverlay.value = false
+    titleScreen?.hide()
     showDebugMenu.value = true
     availablePowerUps.value = gameManager.value.powerUps
     window.removeEventListener('keydown', startOnKey)
@@ -431,8 +227,10 @@ const handleGameOverKey = (e: KeyboardEvent) => {
   const key = e.key.toLowerCase()
   if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
     selectedGameOverIndex.value = (selectedGameOverIndex.value - 1 + 2) % 2
+    gameOverScreen?.setSelectedIndex(selectedGameOverIndex.value)
   } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
     selectedGameOverIndex.value = (selectedGameOverIndex.value + 1) % 2
+    gameOverScreen?.setSelectedIndex(selectedGameOverIndex.value)
   } else if (key === 'z' || key === 'x' || key === 'enter') {
     onGameOverSelect(selectedGameOverIndex.value)
   }
@@ -440,19 +238,44 @@ const handleGameOverKey = (e: KeyboardEvent) => {
 
 // コンティニュー / タイトルに戻る の処理
 const onGameOverSelect = async (index: number) => {
-  if (!showGameOver.value || !gameManager.value || !scene) return
+  const s = scene
+  if (!showGameOver.value || !gameManager.value || !s) return
   showGameOver.value = false
+  gameOverScreen?.hide()
   window.removeEventListener('keydown', handleGameOverKey)
 
   if (index === 0) {
     // ---- コンティニュー ----
-    await gameManager.value.continueGame(scene, GAME_WIDTH, GAME_HEIGHT)
+    await gameManager.value.continueGame(s, GAME_WIDTH, GAME_HEIGHT)
   } else {
     // ---- タイトルに戻る ----
-    while (scene.children.length > 0) scene.remove(scene.children[0]!)
+    // TitleScreen / GameOverScreen / HUD系 を先にシーンから切り離す
+    titleScreen?.destroy()
+    gameOverScreen?.destroy()
+    gameHUD?.destroy()
+    powerUpScreen?.destroy()
+    pauseScreen?.destroy()
+    titleScreen = null
+    gameOverScreen = null
+    gameHUD = null
+    powerUpScreen = null
+    pauseScreen = null
+
+    // title/gameOver/hud などのオーバーレイ系の destroy() により関連Spriteが削除される
+    // sceneにある Light（AmbientLight, DirectionalLight 等）は残し、それ以外をクリアする
+    const objectsToRemove = s.children.filter((obj) => !obj.type.includes('Light') && obj.type !== 'OrthographicCamera')
+    objectsToRemove.forEach((obj) => s.remove(obj))
+
     gameManager.value.destroy()
     gameManager.value = new GameManager()
-    await gameManager.value.init(scene, GAME_WIDTH, GAME_HEIGHT)
+    await gameManager.value.init(s, GAME_WIDTH, GAME_HEIGHT)
+    // 新しいシーンにオーバーレイ画面を再追加
+    titleScreen = new TitleScreen(s)
+    gameOverScreen = new GameOverScreen(s)
+    gameHUD = new GameHUD(s)
+    powerUpScreen = new PowerUpScreen(s)
+    pauseScreen = new PauseScreen(s)
+    titleScreen.show()
     showOverlay.value = true
     window.addEventListener('keydown', startOnKey)
   }
@@ -538,34 +361,64 @@ const handleDebugKey = (e: KeyboardEvent) => {
 
 const handlePowerUpKey = (e: KeyboardEvent) => {
   if (!showPowerUp.value || e.repeat) return
-  if (isKeyHeldOnPowerUpShow.value) return
 
   const key = e.key.toLowerCase()
-  const totalOptions = powerUpOptions.value.length
-  const mainOptionsCount = mainPowerUpOptions.value.length
+  const options = powerUpOptions.value
+  const mainOptions = options.filter((o: any) => o.id !== 'skip')
+  const hasSkip = options.some((o: any) => o.id === 'skip')
+  const mainCount = mainOptions.length
+  const totalCount = options.length
 
   if (key === 'z' || key === 'x' || key === 'enter') {
     selectPowerUp(selectedIndex.value)
   } else if (e.key === 'ArrowLeft') {
-    if (selectedIndex.value < mainOptionsCount)
-      selectedIndex.value = (selectedIndex.value - 1 + mainOptionsCount) % mainOptionsCount
+    if (selectedIndex.value < mainCount) {
+      selectedIndex.value = (selectedIndex.value - 1 + mainCount) % mainCount
+      powerUpScreen?.setSelectedIndex(selectedIndex.value)
+    }
   } else if (e.key === 'ArrowRight') {
-    if (selectedIndex.value < mainOptionsCount)
-      selectedIndex.value = (selectedIndex.value + 1) % mainOptionsCount
+    if (selectedIndex.value < mainCount) {
+      selectedIndex.value = (selectedIndex.value + 1) % mainCount
+      powerUpScreen?.setSelectedIndex(selectedIndex.value)
+    }
   } else if (e.key === 'ArrowDown') {
-    if (selectedIndex.value < mainOptionsCount && skipPowerUpOption.value)
-      selectedIndex.value = totalOptions - 1
+    if (selectedIndex.value < mainCount && hasSkip) {
+      selectedIndex.value = totalCount - 1
+      powerUpScreen?.setSelectedIndex(selectedIndex.value)
+    }
   } else if (e.key === 'ArrowUp') {
-    if (selectedIndex.value === totalOptions - 1)
-      selectedIndex.value = Math.floor(mainOptionsCount / 2)
+    if (selectedIndex.value === totalCount - 1) {
+      selectedIndex.value = Math.floor(mainCount / 2)
+      powerUpScreen?.setSelectedIndex(selectedIndex.value)
+    }
   }
 }
 
-const handlePowerUpKeyUp = () => {
+// handlePowerUpKeyUp は不要になった（isKeyHeldOnPowerUpShow廃止）
+
+const handlePointerMove = (e: MouseEvent) => {
+  if (!showPowerUp.value || !powerUpScreen || !gameContainer.value) return
+  const rect = gameContainer.value.getBoundingClientRect()
+  const scale = rect.width / GAME_WIDTH
+  const displayX = e.clientX - rect.left
+  const displayY = e.clientY - rect.top
+  
+  const sceneX = displayX / scale - GAME_WIDTH / 2
+  // OrthographicCamera: +Y is Up
+  const sceneY = -(displayY / scale - GAME_HEIGHT / 2)
+
+  const hitIndex = powerUpScreen.hitTestCard(sceneX, sceneY)
+  if (hitIndex !== -1) {
+    selectedIndex.value = hitIndex
+    powerUpScreen.setSelectedIndex(hitIndex)
+  }
+}
+
+const handlePointerDown = (e: MouseEvent) => {
   if (!showPowerUp.value) return
-  const s = input.state
-  if (!s.up && !s.down && !s.left && !s.right && !s.shoot && !s.laser && !s.boost)
-    isKeyHeldOnPowerUpShow.value = false
+  if (e.button !== 0) return 
+  handlePointerMove(e)
+  selectPowerUp(selectedIndex.value)
 }
 
 const handlePauseKey = (e: KeyboardEvent) => {
@@ -587,15 +440,19 @@ const handleBlur = () => {
 watch(showPowerUp, (val) => {
   if (val) {
     selectedIndex.value = 0
-    const s = input.state
-    isKeyHeldOnPowerUpShow.value =
-      s.up || s.down || s.left || s.right || s.shoot || s.laser || s.boost
+    // PowerUpScreenを表示
+    const options = powerUpOptions.value
+    const reason = gameManager.value?.powerUpReason ?? null
+    const wave = gameManager.value?.currentWave ?? 0
+    powerUpScreen?.show(options, reason, wave)
     window.addEventListener('keydown', handlePowerUpKey)
-    window.addEventListener('keyup', handlePowerUpKeyUp)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerdown', handlePointerDown)
   } else {
+    powerUpScreen?.hide()
     window.removeEventListener('keydown', handlePowerUpKey)
-    window.removeEventListener('keyup', handlePowerUpKeyUp)
-    isKeyHeldOnPowerUpShow.value = false
+    window.removeEventListener('pointermove', handlePointerMove)
+    window.removeEventListener('pointerdown', handlePointerDown)
   }
 })
 
@@ -653,6 +510,14 @@ onMounted(async () => {
   await gm.init(scene, GAME_WIDTH, GAME_HEIGHT)
   gameManager.value = gm
 
+  // --- オーバーレイ画面（Three.js描画）初期化 ---
+  titleScreen = new TitleScreen(scene)
+  gameOverScreen = new GameOverScreen(scene)
+  gameHUD = new GameHUD(scene)
+  powerUpScreen = new PowerUpScreen(scene)
+  pauseScreen = new PauseScreen(scene)
+  titleScreen.show()
+
   // --- メインループ開始 ---
   lastTime = performance.now()
   animationId = requestAnimationFrame(gameLoop)
@@ -669,6 +534,17 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handlePauseKey)
   window.removeEventListener('blur', handleBlur)
   window.removeEventListener('resize', fitCanvas)
+  titleScreen?.destroy()
+  titleScreen = null
+  gameOverScreen?.destroy()
+  gameOverScreen = null
+  gameHUD?.destroy()
+  gameHUD = null
+  powerUpScreen?.destroy()
+  powerUpScreen = null
+  pauseScreen?.destroy()
+  pauseScreen = null
+
   if (gameManager.value) {
     gameManager.value.destroy()
     gameManager.value = null
@@ -703,179 +579,7 @@ onUnmounted(() => {
   display: block;
 }
 
-/* HUD */
-.hud {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  font-family: 'Orbitron', sans-serif;
-}
 
-.score-area {
-  position: absolute;
-  top: 16px;
-  left: 20px;
-  color: #fff;
-  text-shadow: 1px 1px 4px #000;
-}
-
-.score-line {
-  font-size: 20px;
-  font-weight: bold;
-  margin-bottom: 4px;
-}
-
-.level-line {
-  font-size: 16px;
-  opacity: 0.9;
-  margin-bottom: 4px;
-}
-
-.powerup-list {
-  font-size: 13px;
-  color: #ddeeff;
-  opacity: 0.85;
-}
-
-.hp-bar-wrapper {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 400px;
-}
-
-.hp-bar-track {
-  height: 20px;
-  background: rgba(50, 50, 50, 0.8);
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.hp-bar-fill {
-  height: 100%;
-  border-radius: 10px;
-  transition: width 0.1s ease, background 0.3s ease;
-}
- 
-/* ボス HP ゲージ */
-.boss-hp-bar-outer {
-  margin: 6px auto 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 320px; /* プレイヤー(400px)より一回り小さく */
-}
- 
-.boss-label {
-  color: #ff33ff;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.1rem;
-  text-shadow: 0 0 5px rgba(255, 51, 255, 0.5);
-  flex-shrink: 0;
-}
- 
-.boss-hp-bar-track {
-  flex: 1;
-  height: 6px; /* プレイヤー(20px)より一回り細く */
-  background: rgba(40, 0, 40, 0.6);
-  border: 1px solid rgba(255, 51, 255, 0.3);
-  border-radius: 3px;
-  overflow: hidden;
-  position: relative;
-}
- 
-.boss-hp-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #ff00ff 0%, #ff66aa 100%);
-  transition: width 0.2s ease;
-  box-shadow: 0 0 10px rgba(255, 0, 255, 0.4);
-}
-
-.minimap {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/* Wave アナウンス */
-.announcement {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -200px);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 64px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-  text-align: center;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-/* ボス警告オーバーレイ */
-.boss-warning-overlay {
-  position: absolute;
-  top: 25%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 5;
-}
-
-.boss-warning-content {
-  text-align: center;
-  font-family: 'Orbitron', sans-serif;
-}
-
-.warning-label {
-  font-size: 40px;
-  font-weight: 900;
-  color: #ff3333;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  letter-spacing: 0.8rem;
-  margin-bottom: 10px;
-}
-
-.warning-countdown {
-  font-size: 60px;
-  font-weight: 900;
-  color: #fff;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  margin-top: -5px;
-}
-
-@keyframes warning-bg-flash {
-  0% { opacity: 0.3; }
-  50% { opacity: 1; }
-  100% { opacity: 0.3; }
-}
-
-@keyframes warning-text-pulse {
-  from { transform: scale(1); filter: brightness(1); }
-  to { transform: scale(1.05); filter: brightness(1.5); }
-}
-
-.warning-fade-enter-active, .warning-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.warning-fade-enter-from, .warning-fade-leave-to {
-  opacity: 0;
-}
 
 /* オーバーレイ共通 */
 .overlay {
@@ -899,366 +603,7 @@ onUnmounted(() => {
   letter-spacing: 0.1rem;
 }
 
-/* タイトルアニメーション */
-.title-container {
-  margin-bottom: 2rem;
-  position: relative;
-}
 
-.glitch-title {
-  font-size: 5rem !important;
-  font-weight: 700;
-  color: #00f2ff !important;
-  text-shadow: 
-    0 0 10px rgba(0, 242, 255, 0.8),
-    0 0 20px rgba(0, 242, 255, 0.5),
-    0 0 40px rgba(0, 242, 255, 0.3);
-  margin-bottom: 0.5rem !important;
-  position: relative;
-  letter-spacing: 0.4rem;
-  text-transform: uppercase;
-}
-
-.glitch-title::before,
-.glitch-title::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0.8;
-}
-
-.glitch-title::before {
-  color: #ff00ff;
-  z-index: -1;
-  animation: glitch-anim 3s infinite linear alternate-reverse;
-}
-
-.glitch-title::after {
-  color: #00ffff;
-  z-index: -2;
-  animation: glitch-anim-2 2s infinite linear alternate-reverse;
-}
-
-@keyframes glitch-anim {
-  0% { transform: translate(0); }
-  20% { transform: translate(-2px, 2px); }
-  40% { transform: translate(-2px, -2px); }
-  60% { transform: translate(2px, 2px); }
-  80% { transform: translate(2px, -2px); }
-  100% { transform: translate(0); }
-}
-
-@keyframes glitch-anim-2 {
-  0% { transform: translate(0); }
-  20% { transform: translate(2px, -2px); }
-  40% { transform: translate(2px, 2px); }
-  60% { transform: translate(-2px, -2px); }
-  80% { transform: translate(-2px, 2px); }
-  100% { transform: translate(0); }
-}
-
-.subtitle {
-  font-size: 1.2rem;
-  color: #66ccff;
-  opacity: 0.8;
-  letter-spacing: 0.8rem;
-  margin-top: -0.5rem;
-  text-shadow: 0 0 10px rgba(102, 204, 255, 0.5);
-}
-
-.start-hint {
-  font-size: 1.4rem !important;
-  color: #fff !important;
-  margin: 2rem 0 !important;
-  animation: pulse 2s infinite ease-in-out;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.98); }
-  50% { opacity: 1; transform: scale(1); }
-}
-
-.game-over-text {
-  font-size: 4.5rem !important;
-  color: #ff3333 !important;
-  text-shadow: 
-    0 0 15px rgba(255, 51, 51, 0.8),
-    0 0 30px rgba(255, 51, 51, 0.4);
-  font-weight: 700;
-  margin-bottom: 1rem !important;
-  letter-spacing: 0.5rem;
-}
-
-.controls {
-  margin-top: 3rem;
-  padding: 2rem 3rem;
-  background: rgba(0, 242, 255, 0.05);
-  border-radius: 12px;
-  border: 1px solid rgba(0, 242, 255, 0.2);
-  box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.1);
-}
-
-.controls ul {
-  list-style: none;
-  padding: 0;
-}
-
-.controls li {
-  text-align: left;
-  font-size: 1rem;
-  color: #aaddff;
-  margin: 0.6rem 0;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-/* パワーアップUI */
-.powerup-overlay {
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-}
-
-.powerup-title {
-  font-size: 4rem !important;
-  color: #ffff00 !important;
-  text-shadow:
-    0 0 30px rgba(255, 255, 0, 0.5),
-    0 0 10px rgba(0, 0, 0, 0.5) !important;
-  margin-bottom: 0.5rem !important;
-  letter-spacing: 0.2rem;
-}
-
-.powerup-subtitle {
-  color: #fff !important;
-  font-size: 1.4rem !important;
-  margin-bottom: 2rem !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.powerup-options {
-  display: flex;
-  gap: 20px;
-  margin-top: 2rem;
-  justify-content: center;
-  align-items: stretch;
-}
-
-.powerup-card {
-  width: 280px;
-  height: 320px;
-  padding: 2rem 1.5rem;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.05) 100%
-  );
-  border: 2px solid rgba(0, 255, 204, 0.3);
-  border-radius: 16px;
-  cursor: pointer;
-  transition:
-    background 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.powerup-card:hover,
-.powerup-card.selected {
-  background: linear-gradient(
-    135deg,
-    rgba(0, 255, 204, 0.2) 0%,
-    rgba(0, 255, 204, 0.1) 100%
-  );
-  border-color: #00ffcc;
-  box-shadow: 0 0 30px rgba(0, 255, 204, 0.4);
-}
-
-.powerup-card.selected {
-  animation: pulse-border 1.5s infinite;
-}
-
-@keyframes pulse-border {
-  0% {
-    box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 25px rgba(0, 255, 204, 0.6);
-  }
-  100% {
-    box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-  }
-}
-
-.rarity-stars {
-  color: #ffd700;
-  font-size: 1.2rem;
-  margin-bottom: 0.5rem;
-  letter-spacing: 4px;
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
-}
-
-.powerup-card h3 {
-  color: #00ffcc;
-  font-size: 1.4rem;
-  margin-bottom: 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.level-badge {
-  font-size: 0.9rem;
-  background: rgba(0, 255, 204, 0.2);
-  color: #00ffcc;
-  padding: 0.2rem 0.6rem;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 255, 204, 0.4);
-  font-weight: bold;
-}
-
-.powerup-card p {
-  color: #eee !important;
-  font-size: 0.95rem !important;
-  line-height: 1.4;
-}
-
-.powerup-skip-container {
-  margin-top: 2rem;
-  display: flex;
-  justify-content: center;
-}
-
-.powerup-skip-button {
-  background: rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: #aaa;
-  font-size: 1.1rem;
-  padding: 0.5rem 2rem;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: 'Segoe UI', sans-serif;
-}
-
-.powerup-skip-button:hover,
-.powerup-skip-button.selected {
-  border-color: #fff;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
-  transform: scale(1.05);
-}
-
-/* ゲームオーバー専用スタイル */
-.game-over-overlay {}
-
-.game-over-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-}
-
-.game-over-result {
-  margin: 1.5rem 0 2rem;
-  padding: 1.5rem 3rem;
-  background: rgba(255, 50, 50, 0.08);
-  border: 1px solid rgba(255, 80, 80, 0.25);
-  border-radius: 12px;
-  min-width: 340px;
-}
-
-.result-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.result-row:last-child {
-  border-bottom: none;
-}
-
-.result-label {
-  font-size: 1rem;
-  color: #aaa;
-  letter-spacing: 0.2rem;
-}
-
-.result-value {
-  font-size: 1.6rem;
-  color: #fff;
-  font-weight: bold;
-  letter-spacing: 0.1rem;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-}
-
-.game-over-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 340px;
-}
-
-.game-over-btn {
-  width: 100%;
-  padding: 1rem 2rem;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 1.1rem;
-  font-weight: bold;
-  letter-spacing: 0.15rem;
-  border-radius: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.05);
-  color: #aaa;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.game-over-btn:hover,
-.game-over-btn.selected {
-  color: #fff;
-  transform: scale(1.03);
-}
-
-.game-over-btn:first-child:hover,
-.game-over-btn:first-child.selected {
-  background: rgba(0, 220, 120, 0.15);
-  border-color: #00dc78;
-  box-shadow: 0 0 20px rgba(0, 220, 120, 0.4);
-  text-shadow: 0 0 10px rgba(0, 220, 120, 0.6);
-}
-
-.game-over-btn:last-child:hover,
-.game-over-btn:last-child.selected {
-  background: rgba(180, 180, 255, 0.1);
-  border-color: rgba(180, 180, 255, 0.5);
-  box-shadow: 0 0 15px rgba(180, 180, 255, 0.3);
-}
-
-/* ポーズ */
-.pause-overlay {
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.pause-title {
-  font-size: 4rem !important;
-  color: #aaa !important;
-  letter-spacing: 0.5rem;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2) !important;
-  margin-bottom: 1rem !important;
-}
 
 /* デバッグ */
 .debug-overlay {

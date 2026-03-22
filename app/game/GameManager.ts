@@ -112,6 +112,7 @@ export class GameManager {
 
   public isGameActive: boolean = false
   public isPaused: boolean = false
+  public isInitialized: boolean = false
 
   public get powerUps(): PowerUp[] {
     return this.availablePowerUps
@@ -126,9 +127,12 @@ export class GameManager {
     this.screenHeight = screenHeight
 
     // 状態リセット
+    this.isInitialized = false
+    this.isInitialized = false
     this.objects = []
     this.isGameOver = false
     this.isGameActive = false
+    this.shakeFrames = 0
     this.gameOverTimer = 0
     this.score = 0
     this.playerLevel = 0
@@ -222,6 +226,7 @@ export class GameManager {
     }
 
     this.initPowerUps()
+    this.isInitialized = true
   }
 
   public startWithDebug(powerUpLevels: Record<string, number>, startWave: number): void {
@@ -721,6 +726,7 @@ export class GameManager {
    * 毎フレーム更新
    */
   public update(delta: number, input: InputState): void {
+    if (!this.isInitialized) return
     if (this.isPaused) return
     if (this.isGameOver) return
 
@@ -1644,10 +1650,8 @@ export class GameManager {
   }
 
   public destroy(): void {
-    if (this.scene) {
-      while (this.scene.children.length > 0) {
-        this.scene.remove(this.scene.children[0]!)
-      }
+    if (this.player) {
+      this.player.destroy()
     }
     this.objects.forEach((obj) => obj.destroy())
     this.objects = []
