@@ -156,6 +156,7 @@ const gameLoop = (time: number) => {
   if (showGameOver.value) gameOverScreen?.update(delta)
   if (showPowerUp.value) powerUpScreen?.update(delta)
 
+
   // HUD更新（ゲームプレイ中のみ）
   const hudVisible = isHudVisible()
   gameHUD?.update({
@@ -426,6 +427,14 @@ watch(showPowerUp, (val) => {
   } else {
     powerUpScreen?.hide()
     window.removeEventListener('keydown', handlePowerUpKey)
+  }
+})
+
+watch(isPaused, (val) => {
+  if (val) {
+    pauseScreen?.show()
+  } else {
+    pauseScreen?.hide()
   }
 })
 
