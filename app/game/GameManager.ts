@@ -1666,14 +1666,20 @@ export class GameManager {
     const savedPowerUpLevels = { ...this.powerUpLevels }
     const savedRarityBonus = this.rarityBonus
     const savedScore = this.score
+    const savedLevel = this.playerLevel
+    const savedScoreForNextPowerUp = this.scoreForNextPowerUp
+    const savedCurrentPowerUpInterval = this.currentPowerUpInterval
 
     // シーンとオブジェクトをクリアしてから再初期化
     this.destroy()
     await this.init(scene, screenWidth, screenHeight)
 
-    // スコア・レアリティボーナスを復元
+    // スコア・レアリティボーナス・レベル関連を復元
     this.score = savedScore
     this.rarityBonus = savedRarityBonus
+    this.playerLevel = savedLevel
+    this.scoreForNextPowerUp = savedScoreForNextPowerUp
+    this.currentPowerUpInterval = savedCurrentPowerUpInterval
 
     // 強化状態を復元（effectを再適用）
     for (const [id, level] of Object.entries(savedPowerUpLevels)) {
