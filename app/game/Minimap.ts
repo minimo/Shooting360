@@ -5,6 +5,8 @@ import { Fighter } from './Enemy/Fighter'
 import { AceFighter } from './Enemy/AceFighter'
 import { MissileFlower } from './Enemy/MissileFlower'
 import { CoreDestroyer } from './Enemy/CoreDestroyer'
+import { VoidSerpent } from './Enemy/VoidSerpent'
+import { VoidSerpentSegment } from './Enemy/VoidSerpentSegment'
 import { HomingMissile } from './HomingMissile'
 
 export interface MinimapDot {
@@ -41,10 +43,10 @@ export class Minimap {
       const worldSize = WORLD_SIZE
       const halfSize = worldSize / 2
 
-      if (dx > halfSize) dx -= worldSize
-      if (dx < -halfSize) dx += worldSize
-      if (dy > halfSize) dy -= worldSize
-      if (dy < -halfSize) dy += worldSize
+      while (dx > halfSize) dx -= worldSize
+      while (dx < -halfSize) dx += worldSize
+      while (dy > halfSize) dy -= worldSize
+      while (dy < -halfSize) dy += worldSize
 
       return {
         nx: dx / this.DISPLAY_RADIUS,
@@ -78,17 +80,20 @@ export class Minimap {
     for (const obj of objects) {
       if (!obj.isAlive || obj.isDying) continue
 
-      if (obj instanceof CoreDestroyer) {
+      if (obj instanceof CoreDestroyer || obj instanceof VoidSerpent) {
         const { nx, ny } = toRelativeNorm(obj.position.x, obj.position.y)
         if (inCircle(nx, ny)) {
           // ボスは大きく表示
           this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: '#ff0000', size: 8 })
         }
-      } else if (obj instanceof Fighter || obj instanceof AceFighter || obj instanceof MissileFlower) {
+      } else if (obj instanceof Fighter || obj instanceof AceFighter || obj instanceof MissileFlower || obj instanceof VoidSerpentSegment) {
         const { nx, ny } = toRelativeNorm(obj.position.x, obj.position.y)
         if (inCircle(nx, ny)) {
           const isAce = obj instanceof AceFighter
-          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color: isAce ? '#ffaa00' : '#ff3333', size: isAce ? 5 : 4 })
+          const isSeg = obj instanceof VoidSerpentSegment
+          const color = isAce ? '#ffaa00' : (isSeg ? '#ff5555' : '#ff3333')
+          const size = isSeg ? 6 : (isAce ? 5 : 4)
+          this.dots.push({ nx: nx * 0.5 + 0.5, ny: ny * 0.5 + 0.5, color, size })
         }
       }
     }

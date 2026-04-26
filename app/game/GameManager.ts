@@ -6,6 +6,8 @@ import { AceFighter } from './Enemy/AceFighter'
 import { MissileFlower } from './Enemy/MissileFlower'
 import { CoreDestroyer } from './Enemy/CoreDestroyer'
 import { CoreShield } from './Enemy/CoreShield'
+import { VoidSerpent } from './Enemy/VoidSerpent'
+import { VoidSerpentSegment } from './Enemy/VoidSerpentSegment'
 import { BossDestructionEffect } from './BossDestructionEffect'
 import { Explosion } from './Explosion'
 import { Particle } from './Particle'
@@ -128,7 +130,6 @@ export class GameManager {
 
     // 状態リセット
     this.isInitialized = false
-    this.isInitialized = false
     this.objects = []
     this.isGameOver = false
     this.isGameActive = false
@@ -191,7 +192,7 @@ export class GameManager {
     this.sharedBaseModel = playerModel || null
 
     // 敵機用モデルの読み込み
-    const enemyGltf = await loader.loadAsync('/models/Enemy.glb').catch((e: Error) => {
+    const enemyGltf = await loader.loadAsync('/models/enemy.glb').catch((e: Error) => {
       console.error('Failed to load enemy model:', e)
       return null
     })
@@ -476,10 +477,10 @@ export class GameManager {
       if (obj.isAlive && obj.side === 'enemy' && obj.radius > 0) {
         let dx = obj.position.x - x
         let dy = obj.position.y - y
-        if (dx > WORLD_HALF) dx -= WORLD_SIZE
-        if (dx < -WORLD_HALF) dx += WORLD_SIZE
-        if (dy > WORLD_HALF) dy -= WORLD_SIZE
-        if (dy < -WORLD_HALF) dy += WORLD_SIZE
+        while (dx > WORLD_HALF) dx -= WORLD_SIZE
+        while (dx < -WORLD_HALF) dx += WORLD_SIZE
+        while (dy > WORLD_HALF) dy -= WORLD_SIZE
+        while (dy < -WORLD_HALF) dy += WORLD_SIZE
         const d = Math.sqrt(dx * dx + dy * dy)
         if (d < minDist) {
           minDist = d
@@ -914,7 +915,7 @@ export class GameManager {
         this.enemySpawnTimer -= delta
         if (this.enemySpawnTimer <= 0) {
           const enemyCount = this.objects.filter(
-            (obj) => (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer) && obj.isAlive,
+            (obj) => (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer || obj instanceof VoidSerpent) && obj.isAlive,
           ).length
           const maxSimultaneous = 5 + Math.floor(this.currentWave / 2)
           if (enemyCount < maxSimultaneous) this.spawnEnemy()
@@ -932,7 +933,7 @@ export class GameManager {
         this.totalEnemiesInWave > 0
       ) {
         const enemyCount = this.objects.filter(
-          (obj) => (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer) && obj.isAlive,
+          (obj) => (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer || obj instanceof VoidSerpent) && obj.isAlive,
         ).length
         if (enemyCount === 0) {
           this.isWaitingForClearAnnouncement = true
@@ -1014,21 +1015,38 @@ export class GameManager {
 
     const isBossWave = this.currentWave > 0 && this.currentWave % 5 === 0
     if (isBossWave) {
-      const boss = new CoreDestroyer(
-        this.player.position.x + 1000,
-        this.player.position.y,
-        this.player,
-        (ex, ey, ea) => this.spawnBullet(ex, ey, ea, 'enemy'),
-        (obj) => this.addObject(obj),
-        this.currentWave,
-        (text, active) => {
-          this.bossWarningText = text
-          this.isBossWarningActive = active
+      if (this.currentWave % 10 !== 0) {
+        const boss = new CoreDestroyer(
+          this.player.position.x + 1200,
+          this.player.position.y,
+          this.player,
+          (ex, ey, ea) => this.spawnBullet(ex, ey, ea, 'enemy'),
+          (obj) => this.addObject(obj),
+          this.currentWave,
+          (text, active) => {
+            this.bossWarningText = text
+            this.isBossWarningActive = active
+          }
+        )
+        this.addObject(boss)
+        for (let i = 0; i < 4; i++) {
+          this.addObject(new CoreShield(boss, i))
         }
-      )
-      this.addObject(boss)
-      for (let i = 0; i < 4; i++) {
-        this.addObject(new CoreShield(boss, i))
+      } else {
+        const boss = new VoidSerpent(
+          this.player.position.x + 1200,
+          this.player.position.y,
+          this.player,
+          (ex: number, ey: number, ea: number, side?: 'player' | 'enemy') => this.spawnBullet(ex, ey, ea, side || 'enemy'),
+          (ex: number, ey: number, ea: number) => this.spawnHomingMissile(ex, ey, ea),
+          (obj: GameObject) => this.addObject(obj),
+          this.currentWave,
+          (text: string, active: boolean) => {
+            this.bossWarningText = text
+            this.isBossWarningActive = active
+          }
+        )
+        this.addObject(boss)
       }
       return
     }
@@ -1087,8 +1105,8 @@ export class GameManager {
     ) as Bullet[]
     const enemies = this.objects.filter(
       (obj) =>
-        (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer || obj instanceof CoreShield) && obj.isAlive && !obj.isDying,
-    ) as (Fighter | MissileFlower | CoreDestroyer | CoreShield)[]
+        (obj instanceof Fighter || obj instanceof MissileFlower || obj instanceof CoreDestroyer || obj instanceof CoreShield || obj instanceof VoidSerpent || obj instanceof VoidSerpentSegment) && obj.isAlive && !obj.isDying,
+    ) as (Fighter | MissileFlower | CoreDestroyer | CoreShield | VoidSerpent | VoidSerpentSegment)[]
 
     // レーザー vs 敵機
     // レーザー vs 敵機
@@ -1122,7 +1140,9 @@ export class GameManager {
           )
           const justDied =
             !enemy.isAlive ||
-            (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
+            (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying) ||
+            (enemy instanceof VoidSerpent && enemy.hp <= 0 && !enemy.isDying) ||
+            (enemy instanceof VoidSerpentSegment && enemy.hp <= 0 && !enemy.isDestroyed)
           if (justDied) {
             if (enemy instanceof CoreDestroyer) {
               enemy.isDying = true
@@ -1139,6 +1159,16 @@ export class GameManager {
                   },
                 ),
               )
+            } else if (enemy instanceof VoidSerpent) {
+              enemy.isDying = true
+              this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
+              enemy.getAllActiveSegments().forEach((seg) => {
+                this.spawnDestructionEffect(seg.position.x, seg.position.y, 0, 0)
+                seg.destroySegment()
+              })
+            } else if (enemy instanceof VoidSerpentSegment) {
+              this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+              enemy.destroySegment()
             } else {
               this.spawnDestructionEffect(
                 enemy.position.x,
@@ -1150,6 +1180,10 @@ export class GameManager {
             this.addScore(
               enemy instanceof CoreDestroyer
                 ? 10000
+                : enemy instanceof VoidSerpent
+                ? 20000
+                : enemy instanceof VoidSerpentSegment
+                ? 500
                 : enemy instanceof AceFighter
                 ? 2000
                 : enemy instanceof MissileFlower
@@ -1196,11 +1230,24 @@ export class GameManager {
               bullet.velocity.y,
             )
             this.addScore(10)
-            const justDied = !enemy.isAlive || (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying)
+            const justDied = !enemy.isAlive || 
+                             (enemy instanceof CoreDestroyer && enemy.hp <= 0 && !enemy.isDying) || 
+                             (enemy instanceof VoidSerpent && enemy.hp <= 0 && !enemy.isDying) ||
+                             (enemy instanceof VoidSerpentSegment && enemy.hp <= 0 && !enemy.isDestroyed)
             if (justDied) {
               if (enemy instanceof CoreDestroyer) {
                 enemy.isDying = true
                 this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
+              } else if (enemy instanceof VoidSerpent) {
+                enemy.isDying = true
+                this.addObject(new BossDestructionEffect(enemy.position.x, enemy.position.y, (obj) => this.addObject(obj), (f) => { this.shakeFrames = Math.max(this.shakeFrames, f) }, () => { enemy.isAlive = false }))
+                enemy.getAllActiveSegments().forEach((seg) => {
+                  this.spawnDestructionEffect(seg.position.x, seg.position.y, 0, 0)
+                  seg.destroySegment()
+                })
+              } else if (enemy instanceof VoidSerpentSegment) {
+                this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
+                enemy.destroySegment()
               } else {
                 this.spawnDestructionEffect(
                   enemy.position.x,
@@ -1209,7 +1256,19 @@ export class GameManager {
                   enemy.velocity.y,
                 )
               }
-              this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+              this.addScore(
+                enemy instanceof CoreDestroyer
+                  ? 10000
+                  : enemy instanceof VoidSerpent
+                  ? 20000
+                  : enemy instanceof VoidSerpentSegment
+                  ? 500
+                  : enemy instanceof AceFighter
+                  ? 2000
+                  : enemy instanceof MissileFlower
+                  ? 1000
+                  : 300
+              )
             }
             if (!bullet.isPiercing) break
           }
@@ -1257,7 +1316,7 @@ export class GameManager {
           this.player.velocity.x += nx * bounceForce
           this.player.velocity.y += ny * bounceForce
           
-          if (!(enemy instanceof CoreDestroyer)) {
+          if (!(enemy instanceof CoreDestroyer) && !(enemy instanceof VoidSerpent) && !(enemy instanceof VoidSerpentSegment)) {
             // ボス以外の場合は敵も弾かれ、位置補正(overlap)を行う
             enemy.velocity.x -= nx * bounceForce
             enemy.velocity.y -= ny * bounceForce
@@ -1566,10 +1625,10 @@ export class GameManager {
 
     let dcx = cx - x1
     let dcy = cy - y1
-    if (dcx > WORLD_HALF) dcx -= WORLD_SIZE
-    if (dcx < -WORLD_HALF) dcx += WORLD_SIZE
-    if (dcy > WORLD_HALF) dcy -= WORLD_SIZE
-    if (dcy < -WORLD_HALF) dcy += WORLD_SIZE
+    while (dcx > WORLD_HALF) dcx -= WORLD_SIZE
+    while (dcx < -WORLD_HALF) dcx += WORLD_SIZE
+    while (dcy > WORLD_HALF) dcy -= WORLD_SIZE
+    while (dcy < -WORLD_HALF) dcy += WORLD_SIZE
 
     const correctedCx = x1 + dcx
     const correctedCy = y1 + dcy
@@ -1591,10 +1650,10 @@ export class GameManager {
   private hitTest(a: GameObject, b: GameObject): boolean {
     let dx = a.position.x - b.position.x
     let dy = a.position.y - b.position.y
-    if (dx > WORLD_HALF) dx -= WORLD_SIZE
-    if (dx < -WORLD_HALF) dx += WORLD_SIZE
-    if (dy > WORLD_HALF) dy -= WORLD_SIZE
-    if (dy < -WORLD_HALF) dy += WORLD_SIZE
+    while (dx > WORLD_HALF) dx -= WORLD_SIZE
+    while (dx < -WORLD_HALF) dx += WORLD_SIZE
+    while (dy > WORLD_HALF) dy -= WORLD_SIZE
+    while (dy < -WORLD_HALF) dy += WORLD_SIZE
     const distance = Math.sqrt(dx * dx + dy * dy)
     return distance < (a.radius || 10) + (b.radius || 10)
   }
@@ -1620,10 +1679,10 @@ export class GameManager {
       for (const enemy of enemies) {
         let dx = enemy.position.x - this.player.position.x
         let dy = enemy.position.y - this.player.position.y
-        if (dx > WORLD_HALF) dx -= WORLD_SIZE
-        if (dx < -WORLD_HALF) dx += WORLD_SIZE
-        if (dy > WORLD_HALF) dy -= WORLD_SIZE
-        if (dy < -WORLD_HALF) dy += WORLD_SIZE
+        while (dx > WORLD_HALF) dx -= WORLD_SIZE
+        while (dx < -WORLD_HALF) dx += WORLD_SIZE
+        while (dy > WORLD_HALF) dy -= WORLD_SIZE
+        while (dy < -WORLD_HALF) dy += WORLD_SIZE
         const distSq = dx * dx + dy * dy
         if (distSq < minDistSq) {
           minDistSq = distSq
@@ -1711,10 +1770,10 @@ export class GameManager {
    * 敵リストからボス（CoreDestroyer）を探し、HP情報を更新する
    */
   private syncBossStatus(): void {
-    let boss: CoreDestroyer | undefined
+    let boss: CoreDestroyer | VoidSerpent | undefined
     for (const obj of this.objects) {
-      if (obj instanceof CoreDestroyer && !obj.isDying) {
-        boss = obj
+      if ((obj instanceof CoreDestroyer || obj instanceof VoidSerpent) && !(obj as any).isDying) {
+        boss = obj as CoreDestroyer | VoidSerpent
         break
       }
     }

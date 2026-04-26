@@ -84,10 +84,10 @@ export abstract class GameObject {
     this.position.y += this.velocity.y * delta
 
     // --- ループ処理 (Wrap-around) ---
-    if (this.position.x > WORLD_HALF) this.position.x -= WORLD_SIZE
-    if (this.position.x < -WORLD_HALF) this.position.x += WORLD_SIZE
-    if (this.position.y > WORLD_HALF) this.position.y -= WORLD_SIZE
-    if (this.position.y < -WORLD_HALF) this.position.y += WORLD_SIZE
+    while (this.position.x > WORLD_HALF) this.position.x -= WORLD_SIZE
+    while (this.position.x < -WORLD_HALF) this.position.x += WORLD_SIZE
+    while (this.position.y > WORLD_HALF) this.position.y -= WORLD_SIZE
+    while (this.position.y < -WORLD_HALF) this.position.y += WORLD_SIZE
   }
 
   /**
@@ -99,10 +99,10 @@ export abstract class GameObject {
     let dx = this.position.x - cameraX
     let dy = this.position.y - cameraY
 
-    if (dx > WORLD_HALF) dx -= WORLD_SIZE
-    if (dx < -WORLD_HALF) dx += WORLD_SIZE
-    if (dy > WORLD_HALF) dy -= WORLD_SIZE
-    if (dy < -WORLD_HALF) dy += WORLD_SIZE
+    while (dx > WORLD_HALF) dx -= WORLD_SIZE
+    while (dx < -WORLD_HALF) dx += WORLD_SIZE
+    while (dy > WORLD_HALF) dy -= WORLD_SIZE
+    while (dy < -WORLD_HALF) dy += WORLD_SIZE
 
     // Three.js は y-up なので Y を反転、回転も反転（CCW↔CW）
     this.mesh.position.set(dx, -dy, this.mesh.position.z)
