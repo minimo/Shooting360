@@ -11,6 +11,7 @@ import { VoidSerpentSegment } from './Enemy/VoidSerpentSegment'
 import { BossDestructionEffect } from './BossDestructionEffect'
 import { Explosion } from './Explosion'
 import { Particle } from './Particle'
+import { EnergyOrb } from './EnergyOrb'
 import { Minimap } from './Minimap'
 import { BackgroundObject } from './BackgroundObject'
 import { HomingMissile } from './HomingMissile'
@@ -63,8 +64,9 @@ export class GameManager {
   // スコア・レベル（Vue に公開）
   public score: number = 0
   public playerLevel: number = 0
-  public scoreForNextPowerUp: number = 3000
-  private currentPowerUpInterval: number = 3000
+  public levelUpEnergy: number = 0
+  public energyForNextLevel: number = 60
+  private currentEnergyInterval: number = 60
   private pendingPowerUpSelections: number = 0
   private isWaitingForNextWaveTriggerPending: boolean = false
   public powerUpListEntries: string[] = []
@@ -137,8 +139,9 @@ export class GameManager {
     this.gameOverTimer = 0
     this.score = 0
     this.playerLevel = 0
-    this.scoreForNextPowerUp = 3000
-    this.currentPowerUpInterval = 3000
+    this.levelUpEnergy = 0
+    this.energyForNextLevel = 60
+    this.currentEnergyInterval = 60
     this.pendingPowerUpSelections = 0
     this.isWaitingForNextWaveTriggerPending = false
     this.currentWave = 0
@@ -682,15 +685,20 @@ export class GameManager {
 
   private addScore(amount: number): void {
     this.score += amount
+  }
+
+  private addLevelUpEnergy(amount: number): void {
+    this.levelUpEnergy += amount
 
     let leveledUp = false
-    while (this.score >= this.scoreForNextPowerUp) {
+    while (this.levelUpEnergy >= this.energyForNextLevel) {
+      this.levelUpEnergy -= this.energyForNextLevel
       this.playerLevel++
       this.player.hp = this.player.maxHp // レベルアップ時に体力全回復
       this.pendingPowerUpSelections++
       this.powerUpReason = 'level'
-      this.currentPowerUpInterval += 1000
-      this.scoreForNextPowerUp += this.currentPowerUpInterval
+      this.currentEnergyInterval += 25
+      this.energyForNextLevel = this.currentEnergyInterval
       leveledUp = true
     }
 
@@ -721,6 +729,61 @@ export class GameManager {
     duration: number = 30,
   ): void {
     this.addObject(new HomingExplosion(x, y, scale, duration, vx, vy))
+  }
+
+  private getEnemyScoreValue(
+    enemy: Fighter | MissileFlower | CoreDestroyer | CoreShield | VoidSerpent | VoidSerpentSegment,
+  ): number {
+    return enemy instanceof CoreDestroyer
+      ? 10000
+      : enemy instanceof VoidSerpent
+      ? 20000
+      : enemy instanceof VoidSerpentSegment
+      ? 500
+      : enemy instanceof AceFighter
+      ? 2000
+      : enemy instanceof MissileFlower
+      ? 1000
+      : enemy instanceof CoreShield
+      ? 1000
+      : 300
+  }
+
+  private spawnEnergyBurst(x: number, y: number, scoreValue: number, sourceVx: number = 0, sourceVy: number = 0): void {
+    const totalEnergy = Math.max(1, Math.round(scoreValue / 25))
+    const orbCount = Math.max(1, Math.min(totalEnergy, Math.min(18, Math.round(Math.sqrt(totalEnergy) * 1.75))))
+    let remainingEnergy = totalEnergy
+
+    for (let i = 0; i < orbCount; i++) {
+      const orbsLeft = orbCount - i
+      const baseValue = Math.max(1, Math.round(remainingEnergy / orbsLeft))
+      const variance = Math.max(0, Math.round(baseValue * 0.35))
+      const value =
+        i === orbCount - 1
+          ? remainingEnergy
+          : Math.max(1, Math.min(remainingEnergy - (orbsLeft - 1), baseValue + Math.round((Math.random() - 0.5) * variance)))
+      remainingEnergy -= value
+
+      const angle = Math.random() * Math.PI * 2
+      const speed = 0.4 + Math.random() * 1.4
+      const spreadVx = Math.cos(angle) * speed + sourceVx * 0.15
+      const spreadVy = Math.sin(angle) * speed + sourceVy * 0.15
+      this.addObject(new EnergyOrb(x, y, spreadVx, spreadVy, this.player, value))
+    }
+  }
+
+  private awardEnemyDestruction(
+    enemy: Fighter | MissileFlower | CoreDestroyer | CoreShield | VoidSerpent | VoidSerpentSegment,
+  ): void {
+    const scoreValue = this.getEnemyScoreValue(enemy)
+    this.addScore(scoreValue)
+    this.spawnEnergyBurst(
+      enemy.position.x,
+      enemy.position.y,
+      scoreValue,
+      enemy.velocity.x,
+      enemy.velocity.y,
+    )
   }
 
   /**
@@ -951,6 +1014,10 @@ export class GameManager {
         if (obj.isAlive) {
           obj.update(delta)
           if (obj.laserHitCooldown > 0) obj.laserHitCooldown -= delta
+          if (obj instanceof EnergyOrb && obj.canBeCollected()) {
+            this.addLevelUpEnergy(obj.energyValue)
+            obj.isAlive = false
+          }
         }
         if (obj instanceof HomingMissile && obj.shouldExplode) {
           if (obj.isMaxDistanceExplosion) {
@@ -993,6 +1060,10 @@ export class GameManager {
 
   public get hpPercent(): number {
     return (this.player.hp / this.player.maxHp) * 100
+  }
+
+  public get levelUpEnergyPercent(): number {
+    return this.energyForNextLevel > 0 ? (this.levelUpEnergy / this.energyForNextLevel) * 100 : 0
   }
 
   public get powerPercent(): number {
@@ -1177,19 +1248,7 @@ export class GameManager {
                 enemy.velocity.y,
               )
             }
-            this.addScore(
-              enemy instanceof CoreDestroyer
-                ? 10000
-                : enemy instanceof VoidSerpent
-                ? 20000
-                : enemy instanceof VoidSerpentSegment
-                ? 500
-                : enemy instanceof AceFighter
-                ? 2000
-                : enemy instanceof MissileFlower
-                ? 1000
-                : 300,
-            )
+            this.awardEnemyDestruction(enemy)
           }
         }
       }
@@ -1213,7 +1272,7 @@ export class GameManager {
                       } else {
                           this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
                       }
-                      this.addScore(1000)
+                      this.awardEnemyDestruction(enemy)
                   }
                   if (!bullet.isPiercing) break
               }
@@ -1256,19 +1315,7 @@ export class GameManager {
                   enemy.velocity.y,
                 )
               }
-              this.addScore(
-                enemy instanceof CoreDestroyer
-                  ? 10000
-                  : enemy instanceof VoidSerpent
-                  ? 20000
-                  : enemy instanceof VoidSerpentSegment
-                  ? 500
-                  : enemy instanceof AceFighter
-                  ? 2000
-                  : enemy instanceof MissileFlower
-                  ? 1000
-                  : 300
-              )
+              this.awardEnemyDestruction(enemy)
             }
             if (!bullet.isPiercing) break
           }
@@ -1425,7 +1472,7 @@ export class GameManager {
                     } else {
                         this.spawnDestructionEffect(enemy.position.x, enemy.position.y, 0, 0)
                     }
-                    this.addScore(1000)
+                    this.awardEnemyDestruction(enemy)
                 }
             }
             continue
@@ -1453,7 +1500,7 @@ export class GameManager {
                   enemy.velocity.y,
                 )
               }
-              this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+              this.awardEnemyDestruction(enemy)
             }
           }
         }
@@ -1493,7 +1540,7 @@ export class GameManager {
                     } else {
                         this.spawnDestructionEffect(enemy.position.x, enemy.position.y, enemy.velocity.x, enemy.velocity.y)
                     }
-                    this.addScore(1000)
+                    this.awardEnemyDestruction(enemy)
                 }
                 break
             }
@@ -1522,7 +1569,7 @@ export class GameManager {
                 enemy.velocity.y,
               )
             }
-            this.addScore(enemy instanceof CoreDestroyer ? 10000 : enemy instanceof AceFighter ? 2000 : enemy instanceof MissileFlower ? 1000 : 300)
+            this.awardEnemyDestruction(enemy)
           }
           break
         }
@@ -1726,8 +1773,9 @@ export class GameManager {
     const savedRarityBonus = this.rarityBonus
     const savedScore = this.score
     const savedLevel = this.playerLevel
-    const savedScoreForNextPowerUp = this.scoreForNextPowerUp
-    const savedCurrentPowerUpInterval = this.currentPowerUpInterval
+    const savedLevelUpEnergy = this.levelUpEnergy
+    const savedEnergyForNextLevel = this.energyForNextLevel
+    const savedCurrentEnergyInterval = this.currentEnergyInterval
 
     // シーンとオブジェクトをクリアしてから再初期化
     this.destroy()
@@ -1737,8 +1785,9 @@ export class GameManager {
     this.score = savedScore
     this.rarityBonus = savedRarityBonus
     this.playerLevel = savedLevel
-    this.scoreForNextPowerUp = savedScoreForNextPowerUp
-    this.currentPowerUpInterval = savedCurrentPowerUpInterval
+    this.levelUpEnergy = savedLevelUpEnergy
+    this.energyForNextLevel = savedEnergyForNextLevel
+    this.currentEnergyInterval = savedCurrentEnergyInterval
 
     // 強化状態を復元（effectを再適用）
     for (const [id, level] of Object.entries(savedPowerUpLevels)) {

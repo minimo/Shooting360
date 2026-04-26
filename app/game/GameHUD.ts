@@ -16,7 +16,8 @@ export interface HUDData {
   wave: number
   score: number
   playerLevel: number
-  scoreForNextPowerUp: number
+  energy: number
+  energyForNextLevel: number
   powerUpListText: string
   hpPercent: number
   isBossActive: boolean
@@ -64,8 +65,8 @@ export class GameHUD {
     const UI_SCALE = 1.25
 
     // スコアエリア: 左上 (原点がシーン中心なので、左上は -GAME_WIDTH/2, +GAME_HEIGHT/2)
-    this.scoreSprite = this.createSprite(500, 90, UI_SCALE)
-    this.scoreSprite.position.set(-GAME_WIDTH / 2 + 270 * UI_SCALE, GAME_HEIGHT / 2 - 55 * UI_SCALE, HUD_Z)
+    this.scoreSprite = this.createSprite(720, 130, UI_SCALE)
+    this.scoreSprite.position.set(-GAME_WIDTH / 2 + 450 * UI_SCALE, GAME_HEIGHT / 2 - 75 * UI_SCALE, HUD_Z)
     this.group.add(this.scoreSprite)
 
     // HPゲージ: 上部中央
@@ -137,17 +138,42 @@ export class GameHUD {
     ctx.fillStyle = '#ffffff'
     ctx.fillText(`WAVE ${wave}  SCORE: ${score}`, 10, 8)
 
-    // Lv + NEXT
+    // Lv + energy gauge
     ctx.font = '30px Orbitron, sans-serif'
     ctx.fillStyle = 'rgba(255,255,255,0.9)'
-    ctx.fillText(`Lv.${data.playerLevel}  (NEXT: ${data.scoreForNextPowerUp})`, 10, 56)
+    ctx.fillText(`Lv.${data.playerLevel}`, 10, 56)
+
+    const gaugeX = 148
+    const gaugeY = 58
+    const gaugeW = 500
+    const gaugeH = 24
+    const energyRatio =
+      data.energyForNextLevel > 0
+        ? Math.max(0, Math.min(1, data.energy / data.energyForNextLevel))
+        : 0
+
+    ctx.fillStyle = 'rgba(40, 70, 90, 0.7)'
+    ctx.beginPath()
+    ctx.roundRect(gaugeX, gaugeY, gaugeW, gaugeH, 8)
+    ctx.fill()
+
+    const fillGrad = ctx.createLinearGradient(gaugeX, 0, gaugeX + gaugeW, 0)
+    fillGrad.addColorStop(0, '#58d8ff')
+    fillGrad.addColorStop(1, '#c8ffff')
+    ctx.fillStyle = fillGrad
+    ctx.shadowColor = 'rgba(88,216,255,0.8)'
+    ctx.shadowBlur = 10
+    ctx.beginPath()
+    ctx.roundRect(gaugeX + 2, gaugeY + 2, (gaugeW - 4) * energyRatio, gaugeH - 4, 7)
+    ctx.fill()
+    ctx.shadowBlur = 0
 
     // パワーアップリスト
     if (data.powerUpListText) {
       ctx.font = '22px Orbitron, sans-serif'
       ctx.fillStyle = '#ddeeff'
       ctx.globalAlpha = 0.85
-      ctx.fillText(data.powerUpListText, 10, 96)
+      ctx.fillText(data.powerUpListText, 10, 108)
       ctx.globalAlpha = 1.0
     }
 
