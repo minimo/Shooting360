@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { BackgroundObject } from './BackgroundObject'
 import { CollisionSystem } from './CollisionSystem'
 import { GameObject, WORLD_SIZE } from './GameObject'
+import { GameSessionState } from './GameSessionState'
 import { EnergyOrb } from './EnergyOrb'
 import { HomingMissile } from './HomingMissile'
 import { Laser, LaserState } from './Laser'
@@ -26,6 +27,7 @@ export interface PowerUp {
 
 export class GameManager {
   private scene: THREE.Scene | null = null
+  public readonly state = new GameSessionState()
   public player: Player = new Player(0, 0, () => {}, () => {}, () => false)
   public laser: Laser = new Laser(0, 0)
   public objects: GameObject[] = []
@@ -41,53 +43,9 @@ export class GameManager {
   public collisionSystem: CollisionSystem
 
   private shakeFrames: number = 0
-  public shakeOffset: { x: number; y: number } = { x: 0, y: 0 }
 
-  public isGameOver: boolean = false
   private gameOverTimer: number = 0
   private hasTriggeredMassiveExplosion: boolean = false
-  public gameOverWave: number = 0
-
-  public score: number = 0
-  public playerLevel: number = 0
-  public levelUpEnergy: number = 0
-  public energyForNextLevel: number = 60
-  public currentEnergyInterval: number = 60
-  public pendingPowerUpSelections: number = 0
-  public isWaitingForNextWaveTriggerPending: boolean = false
-  public powerUpListEntries: string[] = []
-
-  public announcementText: string = ''
-  public announcementAlpha: number = 0
-  public bossWarningText: string = ''
-  public isBossWarningActive: boolean = false
-  public bossHp: number = 0
-  public bossMaxHp: number = 0
-  public isBossActive: boolean = false
-
-  public currentWave: number = 0
-  public waveEnemiesSpawned: number = 0
-  public totalEnemiesInWave: number = 0
-  public isWaveClearing: boolean = false
-  public isWaitingForClearAnnouncement: boolean = false
-  public isSpawningDelayed: boolean = false
-  public isWaitingForNextWave: boolean = false
-  public waveTransitionTimer: number = 0
-
-  public isPowerUpSelecting: boolean = false
-  public powerUpReason: 'wave' | 'level' | null = null
-  public currentPowerUpOptions: PowerUp[] = []
-  public availablePowerUps: PowerUp[] = []
-  public rarityBonus: number = 0
-  public powerUpLevels: Record<string, number> = {}
-
-  public enemySpawnTimer: number = 0
-  public enemySpawnInterval: number = 120
-  public homingLaserTimer: number = 0
-
-  public isGameActive: boolean = false
-  public isPaused: boolean = false
-  public isInitialized: boolean = false
 
   public constructor() {
     this.spawnSystem = new SpawnSystem(this)
@@ -98,15 +56,15 @@ export class GameManager {
 
   public get isInWaveTransition(): boolean {
     return (
-      this.isWaitingForClearAnnouncement ||
-      this.isWaveClearing ||
-      this.isPowerUpSelecting ||
-      this.isWaitingForNextWave
+      this.state.isWaitingForClearAnnouncement ||
+      this.state.isWaveClearing ||
+      this.state.isPowerUpSelecting ||
+      this.state.isWaitingForNextWave
     )
   }
 
   public get powerUps(): PowerUp[] {
-    return this.availablePowerUps
+    return this.state.availablePowerUps
   }
 
   public async init(scene: THREE.Scene, screenWidth: number, screenHeight: number): Promise<void> {
@@ -172,15 +130,15 @@ export class GameManager {
     }
 
     this.powerUpSystem.initPowerUps()
-    this.isInitialized = true
+    this.state.isInitialized = true
   }
 
   public startWithDebug(powerUpLevels: Record<string, number>, startWave: number): void {
-    this.currentWave = startWave - 1
-    this.powerUpLevels = {}
+    this.state.currentWave = startWave - 1
+    this.state.powerUpLevels = {}
     this.powerUpSystem.applyPowerUpLevels(powerUpLevels)
     this.waveSystem.startNextWave()
-    this.isGameActive = true
+    this.state.isGameActive = true
   }
 
   public generatePowerUpOptions(): void {
@@ -192,9 +150,9 @@ export class GameManager {
   }
 
   public update(delta: number, input: InputState): void {
-    if (!this.isInitialized || this.isPaused || this.isGameOver) return
+    if (!this.state.isInitialized || this.state.isPaused || this.state.isGameOver) return
 
-    if (!this.player.isAlive && !this.isGameOver) {
+    if (!this.player.isAlive && !this.state.isGameOver) {
       if (this.gameOverTimer <= 0) {
         this.gameOverTimer = 180
         this.hasTriggeredMassiveExplosion = false
@@ -265,15 +223,15 @@ export class GameManager {
           this.hasTriggeredMassiveExplosion = true
         }
       } else {
-        this.gameOverWave = this.currentWave
-        this.isGameOver = true
+        this.state.gameOverWave = this.state.currentWave
+        this.state.isGameOver = true
         return
       }
     }
 
     if (this.player.isAlive) {
-      this.player.mesh.visible = this.isGameActive
-      this.laser.mesh.visible = this.isGameActive
+      this.player.mesh.visible = this.state.isGameActive
+      this.laser.mesh.visible = this.state.isGameActive
     }
 
     this.updateShake(delta)
@@ -284,7 +242,7 @@ export class GameManager {
     let laserTrigger = input.laser
     if (this.player.laserPower <= 0 || this.player.isLaserOverheated) laserTrigger = false
 
-    this.player.currentWave = this.currentWave
+    this.player.currentWave = this.state.currentWave
     this.player.update(delta, input)
     this.laser.updateFromPlayer(
       this.player.position.x,
@@ -294,7 +252,7 @@ export class GameManager {
     this.laser.thickness = 3 * this.player.laserWidthMultiplier
     this.laser.setTrigger(laserTrigger)
 
-    if ((this.powerUpLevels['homing_laser'] || 0) > 0) {
+    if ((this.state.powerUpLevels['homing_laser'] || 0) > 0) {
       this.laser.mesh.visible = false
       if (laserTrigger) this.laser.state = LaserState.FIRING
     }
@@ -303,11 +261,11 @@ export class GameManager {
     this.spawnLaserParticles()
     this.spawnBoostParticles()
 
-    if (this.isGameActive && this.player.isAlive) {
+    if (this.state.isGameActive && this.player.isAlive) {
       this.waveSystem.update(delta)
     }
 
-    if (this.isGameActive || this.gameOverTimer > 0) {
+    if (this.state.isGameActive || this.gameOverTimer > 0) {
       this.collisionSystem.checkCollisions(delta)
       this.waveSystem.syncBossStatus()
 
@@ -359,25 +317,25 @@ export class GameManager {
   }
 
   public addScore(amount: number): void {
-    this.score += amount
+    this.state.score += amount
   }
 
   public addLevelUpEnergy(amount: number): void {
-    this.levelUpEnergy += amount
+    this.state.levelUpEnergy += amount
 
     let leveledUp = false
-    while (this.levelUpEnergy >= this.energyForNextLevel) {
-      this.levelUpEnergy -= this.energyForNextLevel
-      this.playerLevel++
+    while (this.state.levelUpEnergy >= this.state.energyForNextLevel) {
+      this.state.levelUpEnergy -= this.state.energyForNextLevel
+      this.state.playerLevel++
       this.player.hp = this.player.maxHp
-      this.pendingPowerUpSelections++
-      this.powerUpReason = 'level'
-      this.currentEnergyInterval += 25
-      this.energyForNextLevel = this.currentEnergyInterval
+      this.state.pendingPowerUpSelections++
+      this.state.powerUpReason = 'level'
+      this.state.currentEnergyInterval += 25
+      this.state.energyForNextLevel = this.state.currentEnergyInterval
       leveledUp = true
     }
 
-    if (leveledUp && !this.isPowerUpSelecting) {
+    if (leveledUp && !this.state.isPowerUpSelecting) {
       this.powerUpSystem.generatePowerUpOptions()
     }
   }
@@ -399,8 +357,8 @@ export class GameManager {
   }
 
   public get levelUpEnergyPercent(): number {
-    return this.energyForNextLevel > 0
-      ? (this.levelUpEnergy / this.energyForNextLevel) * 100
+    return this.state.energyForNextLevel > 0
+      ? (this.state.levelUpEnergy / this.state.energyForNextLevel) * 100
       : 0
   }
 
@@ -426,73 +384,38 @@ export class GameManager {
     screenWidth: number,
     screenHeight: number,
   ): Promise<void> {
-    const savedWave = this.gameOverWave
-    const savedPowerUpLevels = { ...this.powerUpLevels }
-    const savedRarityBonus = this.rarityBonus
-    const savedScore = this.score
-    const savedLevel = this.playerLevel
-    const savedLevelUpEnergy = this.levelUpEnergy
-    const savedEnergyForNextLevel = this.energyForNextLevel
-    const savedCurrentEnergyInterval = this.currentEnergyInterval
+    const savedWave = this.state.gameOverWave
+    const savedPowerUpLevels = { ...this.state.powerUpLevels }
+    const savedRarityBonus = this.state.rarityBonus
+    const savedScore = this.state.score
+    const savedLevel = this.state.playerLevel
+    const savedLevelUpEnergy = this.state.levelUpEnergy
+    const savedEnergyForNextLevel = this.state.energyForNextLevel
+    const savedCurrentEnergyInterval = this.state.currentEnergyInterval
 
     this.destroy()
     await this.init(scene, screenWidth, screenHeight)
 
-    this.score = savedScore
-    this.rarityBonus = savedRarityBonus
-    this.playerLevel = savedLevel
-    this.levelUpEnergy = savedLevelUpEnergy
-    this.energyForNextLevel = savedEnergyForNextLevel
-    this.currentEnergyInterval = savedCurrentEnergyInterval
+    this.state.score = savedScore
+    this.state.rarityBonus = savedRarityBonus
+    this.state.playerLevel = savedLevel
+    this.state.levelUpEnergy = savedLevelUpEnergy
+    this.state.energyForNextLevel = savedEnergyForNextLevel
+    this.state.currentEnergyInterval = savedCurrentEnergyInterval
 
     this.powerUpSystem.applyPowerUpLevels(savedPowerUpLevels)
 
-    this.currentWave = savedWave - 1
+    this.state.currentWave = savedWave - 1
     this.waveSystem.startNextWave()
-    this.isGameActive = true
+    this.state.isGameActive = true
   }
 
   private resetState(): void {
-    this.isInitialized = false
     this.objects = []
-    this.isGameOver = false
-    this.isGameActive = false
     this.shakeFrames = 0
     this.gameOverTimer = 0
-    this.score = 0
-    this.playerLevel = 0
-    this.levelUpEnergy = 0
-    this.energyForNextLevel = 60
-    this.currentEnergyInterval = 60
-    this.pendingPowerUpSelections = 0
-    this.isWaitingForNextWaveTriggerPending = false
-    this.currentWave = 0
-    this.waveEnemiesSpawned = 0
-    this.totalEnemiesInWave = 0
-    this.isWaveClearing = false
-    this.isWaitingForClearAnnouncement = false
-    this.isSpawningDelayed = false
-    this.isWaitingForNextWave = false
-    this.waveTransitionTimer = 0
     this.hasTriggeredMassiveExplosion = false
-    this.powerUpReason = null
-    this.rarityBonus = 0
-    this.powerUpLevels = {}
-    this.powerUpListEntries = []
-    this.announcementText = ''
-    this.announcementAlpha = 0
-    this.bossWarningText = ''
-    this.isBossWarningActive = false
-    this.bossHp = 0
-    this.bossMaxHp = 0
-    this.isBossActive = false
-    this.shakeOffset = { x: 0, y: 0 }
-    this.currentPowerUpOptions = []
-    this.availablePowerUps = []
-    this.enemySpawnTimer = 0
-    this.enemySpawnInterval = 120
-    this.homingLaserTimer = 0
-    this.isPaused = false
+    this.state.reset()
   }
 
   private updateShake(delta: number): void {
@@ -592,4 +515,87 @@ export class GameManager {
       }
     }
   }
+
+  public get shakeOffset() {
+    return this.state.shakeOffset
+  }
+
+  public set shakeOffset(value) {
+    this.state.shakeOffset = value
+  }
+
+  public get isGameOver() { return this.state.isGameOver }
+  public set isGameOver(value: boolean) { this.state.isGameOver = value }
+  public get gameOverWave() { return this.state.gameOverWave }
+  public set gameOverWave(value: number) { this.state.gameOverWave = value }
+  public get score() { return this.state.score }
+  public set score(value: number) { this.state.score = value }
+  public get playerLevel() { return this.state.playerLevel }
+  public set playerLevel(value: number) { this.state.playerLevel = value }
+  public get levelUpEnergy() { return this.state.levelUpEnergy }
+  public set levelUpEnergy(value: number) { this.state.levelUpEnergy = value }
+  public get energyForNextLevel() { return this.state.energyForNextLevel }
+  public set energyForNextLevel(value: number) { this.state.energyForNextLevel = value }
+  public get currentEnergyInterval() { return this.state.currentEnergyInterval }
+  public set currentEnergyInterval(value: number) { this.state.currentEnergyInterval = value }
+  public get pendingPowerUpSelections() { return this.state.pendingPowerUpSelections }
+  public set pendingPowerUpSelections(value: number) { this.state.pendingPowerUpSelections = value }
+  public get isWaitingForNextWaveTriggerPending() { return this.state.isWaitingForNextWaveTriggerPending }
+  public set isWaitingForNextWaveTriggerPending(value: boolean) { this.state.isWaitingForNextWaveTriggerPending = value }
+  public get powerUpListEntries() { return this.state.powerUpListEntries }
+  public set powerUpListEntries(value: string[]) { this.state.powerUpListEntries = value }
+  public get announcementText() { return this.state.announcementText }
+  public set announcementText(value: string) { this.state.announcementText = value }
+  public get announcementAlpha() { return this.state.announcementAlpha }
+  public set announcementAlpha(value: number) { this.state.announcementAlpha = value }
+  public get bossWarningText() { return this.state.bossWarningText }
+  public set bossWarningText(value: string) { this.state.bossWarningText = value }
+  public get isBossWarningActive() { return this.state.isBossWarningActive }
+  public set isBossWarningActive(value: boolean) { this.state.isBossWarningActive = value }
+  public get bossHp() { return this.state.bossHp }
+  public set bossHp(value: number) { this.state.bossHp = value }
+  public get bossMaxHp() { return this.state.bossMaxHp }
+  public set bossMaxHp(value: number) { this.state.bossMaxHp = value }
+  public get isBossActive() { return this.state.isBossActive }
+  public set isBossActive(value: boolean) { this.state.isBossActive = value }
+  public get currentWave() { return this.state.currentWave }
+  public set currentWave(value: number) { this.state.currentWave = value }
+  public get waveEnemiesSpawned() { return this.state.waveEnemiesSpawned }
+  public set waveEnemiesSpawned(value: number) { this.state.waveEnemiesSpawned = value }
+  public get totalEnemiesInWave() { return this.state.totalEnemiesInWave }
+  public set totalEnemiesInWave(value: number) { this.state.totalEnemiesInWave = value }
+  public get isWaveClearing() { return this.state.isWaveClearing }
+  public set isWaveClearing(value: boolean) { this.state.isWaveClearing = value }
+  public get isWaitingForClearAnnouncement() { return this.state.isWaitingForClearAnnouncement }
+  public set isWaitingForClearAnnouncement(value: boolean) { this.state.isWaitingForClearAnnouncement = value }
+  public get isSpawningDelayed() { return this.state.isSpawningDelayed }
+  public set isSpawningDelayed(value: boolean) { this.state.isSpawningDelayed = value }
+  public get isWaitingForNextWave() { return this.state.isWaitingForNextWave }
+  public set isWaitingForNextWave(value: boolean) { this.state.isWaitingForNextWave = value }
+  public get waveTransitionTimer() { return this.state.waveTransitionTimer }
+  public set waveTransitionTimer(value: number) { this.state.waveTransitionTimer = value }
+  public get isPowerUpSelecting() { return this.state.isPowerUpSelecting }
+  public set isPowerUpSelecting(value: boolean) { this.state.isPowerUpSelecting = value }
+  public get powerUpReason() { return this.state.powerUpReason }
+  public set powerUpReason(value: 'wave' | 'level' | null) { this.state.powerUpReason = value }
+  public get currentPowerUpOptions() { return this.state.currentPowerUpOptions }
+  public set currentPowerUpOptions(value: PowerUp[]) { this.state.currentPowerUpOptions = value }
+  public get availablePowerUps() { return this.state.availablePowerUps }
+  public set availablePowerUps(value: PowerUp[]) { this.state.availablePowerUps = value }
+  public get rarityBonus() { return this.state.rarityBonus }
+  public set rarityBonus(value: number) { this.state.rarityBonus = value }
+  public get powerUpLevels() { return this.state.powerUpLevels }
+  public set powerUpLevels(value: Record<string, number>) { this.state.powerUpLevels = value }
+  public get enemySpawnTimer() { return this.state.enemySpawnTimer }
+  public set enemySpawnTimer(value: number) { this.state.enemySpawnTimer = value }
+  public get enemySpawnInterval() { return this.state.enemySpawnInterval }
+  public set enemySpawnInterval(value: number) { this.state.enemySpawnInterval = value }
+  public get homingLaserTimer() { return this.state.homingLaserTimer }
+  public set homingLaserTimer(value: number) { this.state.homingLaserTimer = value }
+  public get isGameActive() { return this.state.isGameActive }
+  public set isGameActive(value: boolean) { this.state.isGameActive = value }
+  public get isPaused() { return this.state.isPaused }
+  public set isPaused(value: boolean) { this.state.isPaused = value }
+  public get isInitialized() { return this.state.isInitialized }
+  public set isInitialized(value: boolean) { this.state.isInitialized = value }
 }

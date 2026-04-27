@@ -6,7 +6,8 @@ export class PowerUpSystem {
   constructor(private readonly manager: GameManager) {}
 
   public initPowerUps(): void {
-    this.manager.availablePowerUps = [
+    const state = this.manager.state
+    state.availablePowerUps = [
       {
         id: 'hp_up',
         name: 'HP上限アップ',
@@ -167,35 +168,37 @@ export class PowerUpSystem {
   }
 
   public applyPowerUpLevels(powerUpLevels: Record<string, number>): void {
+    const state = this.manager.state
     for (const [id, level] of Object.entries(powerUpLevels)) {
-      const powerUp = this.manager.availablePowerUps.find((p) => p.id === id)
+      const powerUp = state.availablePowerUps.find((p) => p.id === id)
       if (!powerUp || level <= 0) continue
       for (let i = 0; i < level; i++) powerUp.effect(this.manager)
-      this.manager.powerUpLevels[id] = level
+      state.powerUpLevels[id] = level
     }
     this.updatePowerUpListEntries()
   }
 
   public generatePowerUpOptions(): void {
-    this.manager.isPaused = true
-    this.manager.isPowerUpSelecting = true
+    const state = this.manager.state
+    state.isPaused = true
+    state.isPowerUpSelecting = true
 
     const options: PowerUp[] = []
-    const pool = this.manager.availablePowerUps
+    const pool = state.availablePowerUps
       .filter((p) => {
-        const current = this.manager.powerUpLevels[p.id] || 0
+        const current = state.powerUpLevels[p.id] || 0
         return !p.maxLevel || current < p.maxLevel
       })
-      .map((p) => ({ ...p, currentLevel: this.manager.powerUpLevels[p.id] || 0 }))
+      .map((p) => ({ ...p, currentLevel: state.powerUpLevels[p.id] || 0 }))
 
     const getWeight = (rarity: number = 1): number => {
       switch (rarity) {
         case 1:
           return 100
         case 2:
-          return 30 + this.manager.rarityBonus * 20
+          return 30 + state.rarityBonus * 20
         case 3:
-          return 10 + this.manager.rarityBonus * 15
+          return 10 + state.rarityBonus * 15
         default:
           return 100
       }
@@ -229,47 +232,49 @@ export class PowerUpSystem {
       },
     })
 
-    this.manager.currentPowerUpOptions = options
-    this.manager.isPowerUpSelecting = true
+    state.currentPowerUpOptions = options
+    state.isPowerUpSelecting = true
   }
 
   public selectPowerUp(index: number): void {
-    const powerUp = this.manager.currentPowerUpOptions[index]
+    const state = this.manager.state
+    const powerUp = state.currentPowerUpOptions[index]
     if (!powerUp) return
 
     powerUp.effect(this.manager)
     if (powerUp.id && powerUp.id !== 'skip') {
-      this.manager.rarityBonus = 0
-      this.manager.powerUpLevels[powerUp.id] = (this.manager.powerUpLevels[powerUp.id] ?? 0) + 1
+      state.rarityBonus = 0
+      state.powerUpLevels[powerUp.id] = (state.powerUpLevels[powerUp.id] ?? 0) + 1
     }
     this.updatePowerUpListEntries()
-    this.manager.pendingPowerUpSelections--
+    state.pendingPowerUpSelections--
 
-    if (this.manager.pendingPowerUpSelections > 0) {
+    if (state.pendingPowerUpSelections > 0) {
       this.generatePowerUpOptions()
       return
     }
 
-    this.manager.isPowerUpSelecting = false
-    this.manager.powerUpReason = null
-    this.manager.isPaused = false
-    this.manager.currentPowerUpOptions = []
-    if (this.manager.isWaitingForNextWaveTriggerPending) {
-      this.manager.isWaitingForNextWaveTriggerPending = false
-      this.manager.isWaitingForNextWave = true
+    state.isPowerUpSelecting = false
+    state.powerUpReason = null
+    state.isPaused = false
+    state.currentPowerUpOptions = []
+    if (state.isWaitingForNextWaveTriggerPending) {
+      state.isWaitingForNextWaveTriggerPending = false
+      state.isWaitingForNextWave = true
       this.manager.waveSystem.showAnnouncement('', 60)
     }
   }
 
   public updatePowerUpListEntries(): void {
-    this.manager.powerUpListEntries = []
-    for (const pu of this.manager.availablePowerUps) {
-      const level = this.manager.powerUpLevels[pu.id] || 0
+    const state = this.manager.state
+    state.powerUpListEntries = []
+    for (const pu of state.availablePowerUps) {
+      const level = state.powerUpLevels[pu.id] || 0
       if (level <= 0) continue
       if (pu.maxLevel && pu.maxLevel > 1) {
-        this.manager.powerUpListEntries.push(`${pu.name} Lv.${level}`)
+        state.powerUpListEntries.push(`${pu.name} Lv.${level}`)
       } else {
-        this.manager.powerUpListEntries.push(pu.name)
+        state.powerUpListEntries.push(pu.name)
       }
     }
   }

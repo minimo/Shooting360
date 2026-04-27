@@ -10,67 +10,70 @@ export class WaveSystem {
   constructor(private readonly manager: GameManager) {}
 
   public startNextWave(): void {
-    if (this.manager.isWaveClearing) return
+    const state = this.manager.state
+    if (state.isWaveClearing) return
 
-    this.manager.currentWave++
-    this.manager.waveEnemiesSpawned = 0
+    state.currentWave++
+    state.waveEnemiesSpawned = 0
     const enemyCounts = [0, 3, 5, 8, 12, 15]
-    this.manager.totalEnemiesInWave =
-      enemyCounts[this.manager.currentWave] ?? 15 + (this.manager.currentWave - 5) * 5
+    state.totalEnemiesInWave =
+      enemyCounts[state.currentWave] ?? 15 + (state.currentWave - 5) * 5
 
-    const isBossWave = this.manager.currentWave % 5 === 0
-    if (isBossWave) this.manager.totalEnemiesInWave = 1
+    const isBossWave = state.currentWave % 5 === 0
+    if (isBossWave) state.totalEnemiesInWave = 1
 
     const text = isBossWave
-      ? `WAVE ${this.manager.currentWave} BOSS START`
-      : `WAVE ${this.manager.currentWave} START`
+      ? `WAVE ${state.currentWave} BOSS START`
+      : `WAVE ${state.currentWave} START`
     this.showAnnouncement(text, 240)
   }
 
   public update(delta: number): void {
-    if (this.manager.currentWave === 0 && !this.manager.isWaveClearing) {
+    const state = this.manager.state
+    if (state.currentWave === 0 && !state.isWaveClearing) {
       this.startNextWave()
     }
 
     this.updateWaveAnnouncement(delta)
 
     if (
-      !this.manager.isWaveClearing &&
-      !this.manager.isWaitingForClearAnnouncement &&
-      !this.manager.isSpawningDelayed &&
-      !this.manager.isWaitingForNextWave &&
-      !this.manager.isPowerUpSelecting &&
-      this.manager.waveTransitionTimer <= 0 &&
-      this.manager.waveEnemiesSpawned < this.manager.totalEnemiesInWave
+      !state.isWaveClearing &&
+      !state.isWaitingForClearAnnouncement &&
+      !state.isSpawningDelayed &&
+      !state.isWaitingForNextWave &&
+      !state.isPowerUpSelecting &&
+      state.waveTransitionTimer <= 0 &&
+      state.waveEnemiesSpawned < state.totalEnemiesInWave
     ) {
-      this.manager.enemySpawnTimer -= delta
-      if (this.manager.enemySpawnTimer <= 0) {
+      state.enemySpawnTimer -= delta
+      if (state.enemySpawnTimer <= 0) {
         const enemyCount = this.countActiveWaveEnemies()
-        const maxSimultaneous = 5 + Math.floor(this.manager.currentWave / 2)
+        const maxSimultaneous = 5 + Math.floor(state.currentWave / 2)
         if (enemyCount < maxSimultaneous) this.manager.spawnSystem.spawnEnemy()
-        this.manager.enemySpawnTimer = Math.max(30, 120 - this.manager.currentWave * 5)
+        state.enemySpawnTimer = Math.max(30, 120 - state.currentWave * 5)
       }
     }
 
     if (
-      !this.manager.isWaveClearing &&
-      !this.manager.isWaitingForClearAnnouncement &&
-      !this.manager.isWaitingForNextWave &&
-      !this.manager.isPowerUpSelecting &&
-      this.manager.waveTransitionTimer <= 0 &&
-      this.manager.waveEnemiesSpawned >= this.manager.totalEnemiesInWave &&
-      this.manager.totalEnemiesInWave > 0 &&
+      !state.isWaveClearing &&
+      !state.isWaitingForClearAnnouncement &&
+      !state.isWaitingForNextWave &&
+      !state.isPowerUpSelecting &&
+      state.waveTransitionTimer <= 0 &&
+      state.waveEnemiesSpawned >= state.totalEnemiesInWave &&
+      state.totalEnemiesInWave > 0 &&
       this.countActiveWaveEnemies() === 0
     ) {
-      this.manager.isWaitingForClearAnnouncement = true
+      state.isWaitingForClearAnnouncement = true
       this.showAnnouncement('', 180)
     }
   }
 
   public showAnnouncement(text: string, duration: number): void {
-    this.manager.announcementText = text
-    this.manager.announcementAlpha = text === '' ? 0 : 0.5
-    this.manager.waveTransitionTimer = duration
+    const state = this.manager.state
+    state.announcementText = text
+    state.announcementAlpha = text === '' ? 0 : 0.5
+    state.waveTransitionTimer = duration
   }
 
   public syncBossStatus(): void {
@@ -83,16 +86,17 @@ export class WaveSystem {
     }
 
     if (boss) {
-      this.manager.bossHp = boss.hp
-      this.manager.bossMaxHp = boss.maxHp
-      this.manager.isBossActive = true
+      this.manager.state.bossHp = boss.hp
+      this.manager.state.bossMaxHp = boss.maxHp
+      this.manager.state.isBossActive = true
       return
     }
 
-    this.manager.isBossActive = false
+    this.manager.state.isBossActive = false
   }
 
   private clearWave(): void {
+    const state = this.manager.state
     if (this.manager.player.isAlive) {
       this.manager.player.hp = this.manager.player.maxHp
       this.manager.player.laserPower = this.manager.player.maxLaserPower
@@ -105,55 +109,56 @@ export class WaveSystem {
       }
     }
 
-    this.manager.pendingPowerUpSelections++
-    this.manager.powerUpReason = 'wave'
-    this.manager.isWaitingForNextWaveTriggerPending = true
-    if (!this.manager.isPowerUpSelecting) this.manager.powerUpSystem.generatePowerUpOptions()
+    state.pendingPowerUpSelections++
+    state.powerUpReason = 'wave'
+    state.isWaitingForNextWaveTriggerPending = true
+    if (!state.isPowerUpSelecting) this.manager.powerUpSystem.generatePowerUpOptions()
   }
 
   private updateWaveAnnouncement(delta: number): void {
-    if (this.manager.waveTransitionTimer > 0) {
-      this.manager.waveTransitionTimer -= delta
-      if (this.manager.waveTransitionTimer < 60) {
-        this.manager.announcementAlpha = (this.manager.waveTransitionTimer / 60) * 0.7
+    const state = this.manager.state
+    if (state.waveTransitionTimer > 0) {
+      state.waveTransitionTimer -= delta
+      if (state.waveTransitionTimer < 60) {
+        state.announcementAlpha = (state.waveTransitionTimer / 60) * 0.7
       } else {
-        this.manager.announcementAlpha = 0.7
+        state.announcementAlpha = 0.7
       }
       return
     }
 
     if (
-      this.manager.announcementText === '' &&
-      !this.manager.isWaitingForClearAnnouncement &&
-      !this.manager.isWaveClearing &&
-      !this.manager.isSpawningDelayed &&
-      !this.manager.isWaitingForNextWave
+      state.announcementText === '' &&
+      !state.isWaitingForClearAnnouncement &&
+      !state.isWaveClearing &&
+      !state.isSpawningDelayed &&
+      !state.isWaitingForNextWave
     ) {
       return
     }
 
-    const previousText = this.manager.announcementText
-    this.manager.announcementAlpha = 0
-    this.manager.announcementText = ''
+    const previousText = state.announcementText
+    state.announcementAlpha = 0
+    state.announcementText = ''
 
-    if (this.manager.isWaitingForClearAnnouncement) {
-      this.manager.isWaitingForClearAnnouncement = false
+    if (state.isWaitingForClearAnnouncement) {
+      state.isWaitingForClearAnnouncement = false
       this.clearWave()
       return
     }
 
     if (previousText.includes('START')) {
-      this.manager.isSpawningDelayed = true
+      state.isSpawningDelayed = true
       this.showAnnouncement('', 180)
       return
     }
 
     if (previousText !== '') return
 
-    if (this.manager.isSpawningDelayed) {
-      this.manager.isSpawningDelayed = false
-    } else if (this.manager.isWaitingForNextWave) {
-      this.manager.isWaitingForNextWave = false
+    if (state.isSpawningDelayed) {
+      state.isSpawningDelayed = false
+    } else if (state.isWaitingForNextWave) {
+      state.isWaitingForNextWave = false
       this.startNextWave()
     }
   }
