@@ -5,6 +5,8 @@ import type { Player } from './Player'
 export class EnergyOrb extends GameObject {
   public override radius: number = 14
 
+  private static glowTexture: THREE.CanvasTexture | null = null
+
   private readonly player: Player
   private readonly value: number
   private readonly attractRadius: number
@@ -39,9 +41,10 @@ export class EnergyOrb extends GameObject {
     this.attractTimer = 0
 
     this.glowMaterial = new THREE.MeshBasicMaterial({
+      map: EnergyOrb.getGlowTexture(),
       color: 0x66ddff,
       transparent: true,
-      opacity: 0.38,
+      opacity: 0.75,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
@@ -63,6 +66,27 @@ export class EnergyOrb extends GameObject {
 
   public get energyValue(): number {
     return this.value
+  }
+
+  private static getGlowTexture(): THREE.CanvasTexture {
+    if (EnergyOrb.glowTexture) return EnergyOrb.glowTexture
+
+    const canvas = document.createElement('canvas')
+    canvas.width = 128
+    canvas.height = 128
+    const ctx = canvas.getContext('2d')!
+    const gradient = ctx.createRadialGradient(64, 64, 8, 64, 64, 64)
+    gradient.addColorStop(0, 'rgba(255,255,255,1)')
+    gradient.addColorStop(0.35, 'rgba(150,235,255,0.95)')
+    gradient.addColorStop(0.7, 'rgba(90,200,255,0.35)')
+    gradient.addColorStop(1, 'rgba(90,200,255,0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    EnergyOrb.glowTexture = texture
+    return texture
   }
 
   public canBeCollected(): boolean {
