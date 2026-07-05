@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { BackgroundObject } from './BackgroundObject'
 import { CollisionSystem } from './CollisionSystem'
 import { GameObject, WORLD_SIZE } from './GameObject'

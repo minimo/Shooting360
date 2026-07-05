@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils'
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { Afterimage } from './Afterimage'
 import { Bullet } from './Bullet'
 import { CoreDestroyer } from './Enemy/CoreDestroyer'
